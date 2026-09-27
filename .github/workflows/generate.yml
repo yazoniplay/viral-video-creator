@@ -40,10 +40,10 @@ jobs:
           else
             python main.py --autopilot
           fi
-      - name: Upload generated video
+      - name: Upload final video only
         uses: actions/upload-artifact@v4
         with:
-          name: viral-video-${{ github.run_number }}
-          path: output/**
+          name: final-video-${{ github.run_number }}
+          path: output/**/final.mp4
           if-no-files-found: error
           retention-days: 7
