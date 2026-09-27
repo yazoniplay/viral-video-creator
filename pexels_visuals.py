@@ -8,10 +8,27 @@ from config import PEXELS_API_KEY, VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_SCENE_SECOND
 API = "https://api.pexels.com/v1/videos/search"
 
 def _query(topic: str, scene: dict) -> str:
+    topic_l = topic.lower()
+    # Ranking topics need footage of the actual subject, not generic stock
+    # clips. Parkour/freerunning gets a deliberately concrete search.
+    if any(x in topic_l for x in ("parkour", "freerun", "free running")):
+        return "parkour freerunning jump vault"
+    if any(x in topic_l for x in ("skateboard", "skateboarding")):
+        return "skateboarding trick"
+    if any(x in topic_l for x in ("football", "soccer")):
+        return "soccer football skill"
+    if any(x in topic_l for x in ("basketball",)):
+        return "basketball dunk trick"
+    if any(x in topic_l for x in ("surf", "surfing")):
+        return "surfing wave"
+    if any(x in topic_l for x in ("snowboard",)):
+        return "snowboarding trick"
+    if any(x in topic_l for x in ("bmx",)):
+        return "BMX trick jump"
+
     prompt = str(scene.get("prompt", ""))
-    # Prefer concrete visual nouns over the full creative prompt.
     words = re.findall(r"[A-Za-z0-9]+", prompt.lower())
-    stop = {"vertical","cinematic","scene","visualize","visual","realistic","motion","dynamic","premium","lighting","style","about","show","with","the","and","for","from","this","that","no","logos","text"}
+    stop = {"vertical","cinematic","scene","visualize","visual","realistic","motion","dynamic","premium","lighting","style","about","show","with","the","and","for","from","this","that","no","logos","text","footage","stock","video"}
     useful = [w for w in words if w not in stop and len(w) > 2]
     base = " ".join(useful[:7])
     return base or topic
@@ -35,7 +52,6 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
     r.raise_for_status()
     videos = r.json().get("videos", [])
     if not videos:
-        # Broaden the search before failing.
         params["query"] = topic
         r = requests.get(API, headers=headers, params=params, timeout=30)
         r.raise_for_status()
@@ -43,7 +59,6 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
     if not videos:
         raise RuntimeError(f"No Pexels video found for query: {query}")
 
-    # Pick a different result for each scene where possible.
     video = videos[(index - 1) % len(videos)]
     files = [x for x in video.get("video_files", []) if x.get("file_type") == "video/mp4" and x.get("link")]
     files.sort(key=lambda x: (abs((x.get("height", 0) / max(x.get("width", 1), 1)) - 16/9), -(x.get("width", 0))))
@@ -53,17 +68,17 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
     output.parent.mkdir(parents=True, exist_ok=True)
     source = output.with_suffix(".source.mp4")
     _download(files[0]["link"], source)
-    duration = float(duration or scene.get("duration") or VIDEO_SCENE_SECONDS)
+    target_duration = float(duration or scene.get("duration") or VIDEO_SCENE_SECONDS)
     vf = (
         "setpts=PTS-STARTPTS,"
         f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
         f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
-        "setsar=1,"
-        "eq=saturation=1.08:contrast=1.03"
+        "setsar=1,eq=saturation=1.08:contrast=1.03,"
+        "fps=30,setpts=N/(30*TB)"
     )
     result = subprocess.run([
         "ffmpeg","-y","-stream_loop","-1","-i",str(source),
-        "-t",str(duration),"-vf",vf,
+        "-vf",vf,"-t",str(target_duration),
         "-an","-r","30","-fps_mode","cfr","-c:v","libx264","-preset","veryfast","-crf","21",
         "-pix_fmt","yuv420p","-movflags","+faststart",str(output)
     ], capture_output=True, text=True)
