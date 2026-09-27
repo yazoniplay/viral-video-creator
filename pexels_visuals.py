@@ -59,16 +59,19 @@ def make_scene(topic: str, scene: dict, index: int, output: Path) -> dict:
         f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
         "setsar=1,"
         "eq=saturation=1.08:contrast=1.03,"
-        "drawtext=text='Footage: Pexels':"
+        "drawtext=text=Footage\\: Pexels:"
         "x=w-tw-45:y=h-th-45:fontsize=28:fontcolor=white@0.82:"
         "box=1:boxcolor=black@0.35:boxborderw=10"
     )
-    subprocess.run([
+    result = subprocess.run([
         "ffmpeg","-y","-stream_loop","-1","-i",str(source),
         "-t",str(duration),"-vf",vf,
         "-an","-c:v","libx264","-preset","veryfast","-crf","21",
         "-pix_fmt","yuv420p","-movflags","+faststart",str(output)
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    ], capture_output=True, text=True)
+    if result.returncode != 0:
+        source.unlink(missing_ok=True)
+        raise RuntimeError("FFmpeg failed while processing Pexels footage: " + result.stderr[-3000:])
     source.unlink(missing_ok=True)
 
     return {
