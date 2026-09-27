@@ -38,12 +38,16 @@ Every scene must have a distinct visual event and move the story forward.
 The last scene should visually echo the first for a seamless loop.
 Return JSON keys: title, hook, script, scenes."""
     url="https://generativelanguage.googleapis.com/v1beta/models/"+GEMINI_MODEL+":generateContent"
-    response=requests.post(url,params={"key":GEMINI_API_KEY},json={
+    try:
+        response=requests.post(url,headers={"x-goog-api-key":GEMINI_API_KEY,"Content-Type":"application/json"},json={
         "systemInstruction":{"parts":[{"text":SYSTEM}]},
         "contents":[{"parts":[{"text":prompt}]}],
         "generationConfig":{"temperature":0.95,"responseMimeType":"application/json"}
     },timeout=90)
-    response.raise_for_status()
-    text=response.json()["candidates"][0]["content"]["parts"][0]["text"]
-    result=json.loads(text)
-    return result if len(result.get("scenes",[]))==VIDEO_SCENES else fallback(topic,hook_override)
+        response.raise_for_status()
+        text=response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        result=json.loads(text)
+        return result if len(result.get("scenes",[]))==VIDEO_SCENES else fallback(topic,hook_override)
+    except (requests.RequestException, KeyError, IndexError, json.JSONDecodeError) as exc:
+        print(f"Gemini storyboard unavailable ({exc}); using local fallback storyboard.")
+        return fallback(topic,hook_override)
