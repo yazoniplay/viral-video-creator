@@ -29,21 +29,20 @@ jobs:
         run: pip install -r requirements.txt
       - name: Generate
         env:
-          FAL_KEY: ${{ secrets.FAL_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          DISCORD_WEBHOOK_VIDEO_URL: ${{ secrets.DISCORD_WEBHOOK_VIDEO_URL }}
+          GEMINI_API_KEY: ${ secrets.GEMINI_API_KEY }}
+          YOUTUBE_API_KEY: ${ secrets.YOUTUBE_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_VIDEO_URL: ${ secrets.DISCORD_WEBHOOK_VIDEO_URL }}
         run: |
-          if [ -n "${{ inputs.topic }}" ]; then
-            python main.py --topic "${{ inputs.topic }}"
+          if [ "${ github.event_name }}" = "workflow_dispatch" ] && [ -n "${ inputs.topic }}" ]; then
+            python main.py --topic "${ inputs.topic }}"
           else
             python main.py --autopilot
           fi
       - name: Upload generated video
         uses: actions/upload-artifact@v4
         with:
-          name: viral-video-${{ github.run_number }}
+          name: viral-video-${ github.run_number }}
           path: output/**
           if-no-files-found: error
           retention-days: 7

@@ -11,33 +11,22 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     validate()
     run_id=time.strftime("%Y%m%d-%H%M%S")+"-"+uuid.uuid4().hex[:6]
     root=OUTPUT_DIR/run_id; scenes_dir=root/"scenes"; root.mkdir(parents=True,exist_ok=True)
-    stage("Pipeline started","Building an original AI-generated short.",topic=topic,run_id=run_id,
+    stage("Pipeline started","Building a $0 locally-rendered vertical short.",topic=topic,run_id=run_id,
           mode="autonomous" if selected_trend else "manual")
     storyboard=create_storyboard(topic,hook_override)
-    if hook_override:
-        storyboard["hook"]=hook_override
+    if hook_override: storyboard["hook"]=hook_override
     storyboard["hook_variants"]=hook_variants or [storyboard.get("hook","")]
     (root/"storyboard.json").write_text(json.dumps(storyboard,indent=2),encoding="utf-8")
     if selected_trend:
         (root/"trend.json").write_text(json.dumps(selected_trend,indent=2),encoding="utf-8")
         stage("Trend selected","Autopilot selected a fresh short-form topic.",source=selected_trend.get("source",""),score=selected_trend.get("score",0))
-    stage("Storyboard ready","AI creative director produced the story and shot list.",
-          hook=storyboard.get("hook",""),scenes=len(storyboard["scenes"]))
+    stage("Storyboard ready","Creative director produced the story and shot list.",hook=storyboard.get("hook",""),scenes=len(storyboard["scenes"]))
     scene_paths=[]; scene_meta=[]
     for index,scene in enumerate(storyboard["scenes"],1):
-        stage("Generating scene",f"AI video generation {index}/{len(storyboard['scenes'])}.",
-              scene=index,purpose=scene.get("purpose",""))
-        path=scenes_dir/f"scene_{index:02d}.mp4"; last_error=None
-        for attempt in range(1,3):
-            try:
-                meta=generate_scene(scene["prompt"],path)
-                scene_paths.append(path); scene_meta.append({**scene,**meta,"attempt":attempt})
-                break
-            except Exception as exc:
-                last_error=exc
-                stage("Scene retry","Generation failed; retrying.",attempt=attempt,error=exc)
-        else:
-            raise RuntimeError(f"Scene {index} failed after retries: {last_error}")
+        stage("Rendering scene",f"Local generated visual {index}/{len(storyboard['scenes'])}.",scene=index,purpose=scene.get("purpose",""))
+        path=scenes_dir/f"scene_{index:02d}.mp4"
+        meta=generate_scene(scene["prompt"],path,topic=topic,scene=scene,index=index)
+        scene_paths.append(path); scene_meta.append({**scene,**meta})
     raw=root/"assembled.mp4"; concat_scenes(scene_paths,raw)
     voice=root/"voice.mp3"; make_voiceover(storyboard["script"],voice)
     voiced=root/"voiced.mp4"; add_voice(raw,voice,voiced)
@@ -50,7 +39,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     manifest={"run_id":run_id,"topic":topic,"title":storyboard.get("title"),
       "hook":storyboard.get("hook"),"hook_variants":storyboard.get("hook_variants",[]),
       "script":storyboard.get("script"),"trend":selected_trend,"scenes":scene_meta,
-      "generation":{"mode":"ai_text_to_video","all_scenes_ai_generated":True,"scene_count":len(scene_paths)},
+      "generation":{"mode":"local_procedural","all_scenes_locally_generated":True,"scene_count":len(scene_paths),"external_video_generation":False},
       "qc":qc,"files":{"video":str(final),"storyboard":str(root/"storyboard.json"),"captions":str(srt)}}
     manifest_path=root/"manifest.json"
     manifest_path.write_text(json.dumps(manifest,indent=2),encoding="utf-8")
@@ -59,7 +48,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     return final
 
 if __name__=="__main__":
-    parser=argparse.ArgumentParser(description="Generate an original AI-made vertical video.")
+    parser=argparse.ArgumentParser(description="Generate an original $0 vertical video.")
     parser.add_argument("--topic",help="Topic to generate. Omit for autonomous trend mode.")
     parser.add_argument("--autopilot",action="store_true",help="Discover a fresh topic and generate automatically.")
     args=parser.parse_args()
