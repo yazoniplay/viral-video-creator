@@ -55,6 +55,7 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
     _download(files[0]["link"], source)
     duration = float(duration or scene.get("duration") or VIDEO_SCENE_SECONDS)
     vf = (
+        "setpts=PTS-STARTPTS,"
         f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
         f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
         "setsar=1,"
@@ -63,7 +64,7 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
     result = subprocess.run([
         "ffmpeg","-y","-stream_loop","-1","-i",str(source),
         "-t",str(duration),"-vf",vf,
-        "-an","-c:v","libx264","-preset","veryfast","-crf","21",
+        "-an","-r","30","-fps_mode","cfr","-c:v","libx264","-preset","veryfast","-crf","21",
         "-pix_fmt","yuv420p","-movflags","+faststart",str(output)
     ], capture_output=True, text=True)
     if result.returncode != 0:
