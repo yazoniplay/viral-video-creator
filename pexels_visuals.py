@@ -58,10 +58,7 @@ def make_scene(topic: str, scene: dict, index: int, output: Path) -> dict:
         f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
         f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
         "setsar=1,"
-        "eq=saturation=1.08:contrast=1.03,"
-        "drawtext=text=Footage\\: Pexels:"
-        "x=w-tw-45:y=h-th-45:fontsize=28:fontcolor=white@0.82:"
-        "box=1:boxcolor=black@0.35:boxborderw=10"
+        "eq=saturation=1.08:contrast=1.03"
     )
     result = subprocess.run([
         "ffmpeg","-y","-stream_loop","-1","-i",str(source),
