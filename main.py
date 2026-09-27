@@ -19,7 +19,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     print(f"[pipeline] storyboard ready: {storyboard.get('format')} / {len(storyboard['scenes'])} scenes")
 
     # Generate narration first so the visual timeline exactly follows the finished voice.
-    voice=root/"voice.mp3"
+    voice=root/"voice.wav"
     make_voiceover(storyboard["script"],voice)
     narration_duration=media_duration(voice)
     visual_duration=narration_duration+0.75
@@ -73,7 +73,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         "scenes":scene_meta,
         "generation":{
             "mode":"pexels_stock_video",
-            "voice":"elevenlabs",
+            "voice":"kokoro_local",
             "ranking_overlay":storyboard.get("format")=="ranking",
             "scene_count":len(scene_paths),
             "external_video_generation":False
