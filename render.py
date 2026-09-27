@@ -125,7 +125,7 @@ def final_master(video: Path,output: Path):
     subprocess.run([
         "ffmpeg","-y","-i",str(video),
         "-vf","eq=contrast=1.04:saturation=1.06:brightness=0.01,unsharp=5:5:0.35",
-        "-c:v","libx264","-preset","medium","-crf","17",
+        "-c:v","libx264","-preset","veryfast","-crf","19","-threads","2",
         "-c:a","aac","-b:a","192k","-movflags","+faststart",str(output)
     ],check=True)
 
