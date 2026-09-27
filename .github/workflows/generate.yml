@@ -28,6 +28,14 @@ jobs:
       - name: TTS runtime
         run: sudo apt-get update && sudo apt-get install -y espeak-ng
 
+      - name: Verify FFmpeg drawtext
+        run: |
+          if ! ffmpeg -hide_banner -filters | grep -E '(^|[[:space:]])drawtext([[:space:]]|$)'; then
+            echo "drawtext filter is missing from the FFmpeg binary"
+            ffmpeg -hide_banner -filters
+            exit 1
+          fi
+
       - name: Dependencies
         run: pip install -r requirements.txt
       - name: Generate
