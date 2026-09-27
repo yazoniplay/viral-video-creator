@@ -3,6 +3,7 @@ import re
 import subprocess
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import numpy as np
 
 from config import VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_SCENE_SECONDS
 
@@ -48,15 +49,15 @@ def make_scene(topic:str, scene:dict, index:int, output:Path):
 
     for n in range(frames):
         t=n/max(1,frames-1)
-        img=Image.new("RGB",(VIDEO_WIDTH,VIDEO_HEIGHT))
-        px=img.load()
-        for y in range(VIDEO_HEIGHT):
-            v=y/(VIDEO_HEIGHT-1)
-            for x in range(VIDEO_WIDTH):
-                u=x/(VIDEO_WIDTH-1)
-                wave=(math.sin((u+t)*math.pi*2)+math.cos((v-t)*math.pi*3))*0.5
-                mix=max(0,min(1,v+0.10*math.sin(t*math.pi*2)))
-                px[x,y]=tuple(max(0,min(255,int(c1[k]*(1-mix)+c2[k]*mix+wave*12))) for k in range(3))
+        rw,rh=540,960
+        yy,xx=np.mgrid[0:rh,0:rw]
+        u=xx/(rw-1); v=yy/(rh-1)
+        wave=(np.sin((u+t)*math.pi*2)+np.cos((v-t)*math.pi*3))*0.5
+        mix=np.clip(v+0.10*math.sin(t*math.pi*2),0,1)
+        arr=np.empty((rh,rw,3),dtype=np.uint8)
+        for k in range(3):
+            arr[:,:,k]=np.clip(c1[k]*(1-mix)+c2[k]*mix+wave*12,0,255)
+        img=Image.fromarray(arr,"RGB").resize((VIDEO_WIDTH,VIDEO_HEIGHT),Image.Resampling.BILINEAR)
         draw=ImageDraw.Draw(img,"RGBA")
         for layer in range(7):
             radius=220+layer*85
