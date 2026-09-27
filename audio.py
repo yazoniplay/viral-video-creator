@@ -23,7 +23,7 @@ def make_voiceover(text: str, output_path: Path):
         params={"output_format": "mp3_44100_128"},
         json={
             "text": text,
-            "model_id": ELEVENLABS_MODEL,
+            "model_id": ELEVENLABS_MODEL or "eleven_flash_v2_5",
             "voice_settings": {
                 "stability": 0.38,
                 "similarity_boost": 0.82,
