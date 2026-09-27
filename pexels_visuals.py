@@ -24,7 +24,7 @@ def _download(url: str, path: Path):
                 if chunk:
                     f.write(chunk)
 
-def make_scene(topic: str, scene: dict, index: int, output: Path) -> dict:
+def make_scene(topic: str, scene: dict, index: int, output: Path, duration: float | None = None) -> dict:
     if not PEXELS_API_KEY:
         raise RuntimeError("PEXELS_API_KEY is missing. Add your Pexels API key to GitHub Actions secrets.")
 
@@ -53,7 +53,7 @@ def make_scene(topic: str, scene: dict, index: int, output: Path) -> dict:
     output.parent.mkdir(parents=True, exist_ok=True)
     source = output.with_suffix(".source.mp4")
     _download(files[0]["link"], source)
-    duration = VIDEO_SCENE_SECONDS
+    duration = float(duration or scene.get("duration") or VIDEO_SCENE_SECONDS)
     vf = (
         f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
         f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
