@@ -41,6 +41,8 @@ def _wrap(text,font,max_width):
 def make_scene(topic:str, scene:dict, index:int, output:Path):
     output.parent.mkdir(parents=True,exist_ok=True)
     c1,c2,c3=_palette(topic+str(index))
+    purpose=str(scene.get("purpose") or f"Scene {index}").lower()
+    ranking=any(x in purpose for x in ("rank 1","rank 2","rank 3","rank 4","rank 5","countdown"))
     title=str(scene.get("purpose") or f"Scene {index}").replace("_"," ").title()
     label=" ".join(re.sub(r"[^A-Za-z0-9 ]+"," ",topic).split()[:7]) or "TRENDING TOPIC"
     fps=30; frames=VIDEO_SCENE_SECONDS*fps
@@ -59,6 +61,29 @@ def make_scene(topic:str, scene:dict, index:int, output:Path):
             arr[:,:,k]=np.clip(c1[k]*(1-mix)+c2[k]*mix+wave*12,0,255)
         img=Image.fromarray(arr,"RGB").resize((VIDEO_WIDTH,VIDEO_HEIGHT),Image.Resampling.BILINEAR)
         draw=ImageDraw.Draw(img,"RGBA")
+        # Vary the composition by scene instead of repeating the same abstract background.
+        style=index % 5
+        if ranking:
+            nums={"rank 5":"5","rank 4":"4","rank 3":"3","rank 2":"2","rank 1":"1"}
+            rank=next((v for k,v in nums.items() if k in purpose), "5")
+            draw.rounded_rectangle((55,55,VIDEO_WIDTH-55,VIDEO_HEIGHT-55),radius=55,outline=(*c3,210),width=12)
+            badge_font=_font(230)
+            bw=draw.textbbox((0,0),rank,font=badge_font)[2]
+            draw.text(((VIDEO_WIDTH-bw)/2,270),rank,font=badge_font,fill=(255,255,255,245),stroke_width=5,stroke_fill=(*c1,220))
+            draw.text((90,570),"TOP MOMENT",font=medium,fill=(255,255,255,230))
+        elif style == 1:
+            draw.rounded_rectangle((70,170,VIDEO_WIDTH-70,VIDEO_HEIGHT-220),radius=45,outline=(*c3,190),width=9)
+            draw.line((70,VIDEO_HEIGHT//2,VIDEO_WIDTH-70,VIDEO_HEIGHT//2),fill=(*c3,150),width=5)
+        elif style == 2:
+            for j in range(5):
+                x=80+j*205
+                draw.rounded_rectangle((x,330,x+155,1150),radius=30,fill=(*c3,55),outline=(*c3,170),width=4)
+        elif style == 3:
+            for j in range(4):
+                x=110+j*260
+                draw.polygon([(x,1080),(x+120,760),(x+240,1080)],fill=(*c3,70),outline=(*c3,170))
+        else:
+            draw.ellipse((110,300,970,1160),outline=(*c3,180),width=12)
         for layer in range(7):
             radius=220+layer*85
             cx=int(VIDEO_WIDTH*(0.18+0.72*((t*(0.22+layer*0.025)+layer*0.17)%1)))
