@@ -22,6 +22,6 @@ def make_srt(text:str,audio:Path,output:Path):
 
 def burn_captions(video:Path,srt:Path,output:Path):
     subtitle=str(srt).replace("\\","/").replace(":","\\:")
-    vf=f"subtitles='{subtitle}':force_style='FontName=Arial,FontSize=20,Bold=1,Outline=3,Alignment=2,MarginV=180'"
+    vf=f"subtitles='{subtitle}':force_style='FontName=Arial,FontSize=20,Bold=1,Outline=3,Alignment=2,MarginV=70'"
     subprocess.run(["ffmpeg","-y","-i",str(video),"-vf",vf,"-c:v","libx264","-preset","medium",
         "-crf","18","-c:a","aac","-b:a","192k",str(output)],check=True)
