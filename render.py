@@ -11,7 +11,10 @@ def _escape_drawtext(text: str) -> str:
 
 def concat_scenes(scenes: list[Path], output: Path):
     listing=output.with_suffix(".txt")
-    listing.write_text("".join(f"file '{p.resolve()}'\\n" for p in scenes),encoding="utf-8")
+    listing.write_text(
+        "".join(f"file '{p.resolve()}'\n" for p in scenes),
+        encoding="utf-8",
+    )
     subprocess.run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(listing),
         "-an","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,format=yuv420p",
         "-c:v","libx264","-preset","medium","-crf","18",str(output)],check=True)
@@ -34,7 +37,6 @@ def apply_ranking_overlay(video: Path, storyboard: dict, output: Path, total_dur
     scenes=storyboard.get("scenes",[])
     per_scene=total_duration/max(len(scenes),1)
     filters=[]
-    # Soft panel keeps the leaderboard readable without covering the whole video.
     filters.append("drawbox=x=28:y=190:w=490:h=1120:color=black@0.48:t=fill")
     title=_escape_drawtext(storyboard.get("title") or "TOP 5")
     filters.append(
@@ -45,7 +47,6 @@ def apply_ranking_overlay(video: Path, storyboard: dict, output: Path, total_dur
         rank=int(entry.get("rank",pos+1))
         name=_escape_drawtext(entry.get("name") or f"Rank {rank}")
         y=255+pos*205
-        # Every rank remains visible. The active rank is drawn again in a brighter accent.
         filters.append(
             f"drawtext=fontfile={FONT_BOLD}:text='{rank}':fontcolor=white:fontsize=64:"
             f"x=62:y={y}:shadowcolor=black@0.8:shadowx=2:shadowy=2"
