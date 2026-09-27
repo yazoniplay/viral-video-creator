@@ -47,7 +47,19 @@ Return JSON keys: title, hook, script, scenes."""
         response.raise_for_status()
         text=response.json()["candidates"][0]["content"]["parts"][0]["text"]
         result=json.loads(text)
-        return result if len(result.get("scenes",[]))==VIDEO_SCENES else fallback(topic,hook_override)
+        scenes=result.get("scenes", [])
+        # Normalize model output so the renderer always receives the fields it needs.
+        normalized=[]
+        for i, scene in enumerate(scenes[:VIDEO_SCENES], 1):
+            if not isinstance(scene, dict):
+                continue
+            purpose=str(scene.get("purpose") or scene.get("title") or f"Scene {i}")
+            prompt_text=scene.get("prompt") or scene.get("visual_prompt") or scene.get("description") or purpose
+            normalized.append({**scene, "purpose": purpose, "prompt": str(prompt_text), "duration": int(scene.get("duration", 5) or 5)})
+        if len(normalized) == VIDEO_SCENES:
+            result["scenes"] = normalized
+            return result
+        return fallback(topic,hook_override)
     except (requests.RequestException, KeyError, IndexError, json.JSONDecodeError) as exc:
         print(f"Gemini storyboard unavailable ({exc}); using local fallback storyboard.")
         return fallback(topic,hook_override)
