@@ -8,9 +8,9 @@ FONT_REGULAR="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 def _ass_escape(text: str) -> str:
     return (
         str(text)
-        .replace("\\", "\\")
-        .replace("{", "\{")
-        .replace("}", "\}")
+        .replace("\\", "\\\\")
+        .replace("{", "\\{")
+        .replace("}", "\\}")
         .replace("\n", " ")
         .replace("\r", " ")
     )
@@ -49,7 +49,6 @@ def _write_ranking_ass(path: Path, title: str, entries: list[dict], per_scene: f
         rank=int(entry.get("rank",pos+1))
         name=_ass_escape(entry.get("name") or f"Rank {rank}")
         y=255+pos*205
-        # Alignment 7 anchors at top-left; use explicit positions for stable layout.
         lines.append(f"Dialogue: 0,0:00:00.00,{_ass_time(total_duration)},Rank,,0,0,0,,{{\\pos(62,{y})}}{rank}")
         lines.append(f"Dialogue: 0,0:00:00.00,{_ass_time(total_duration)},Name,,0,0,0,,{{\\pos(145,{y+12})}}{name}")
         scene_index=max(0,5-rank)
@@ -61,19 +60,39 @@ def _write_ranking_ass(path: Path, title: str, entries: list[dict], per_scene: f
 
 
 def concat_scenes(scenes: list[Path], output: Path):
-    listing=output.with_suffix(".txt")
-    listing.write_text(
-        "".join(f"file '{p.resolve()}'\n" for p in scenes),
-        encoding="utf-8",
+    if not scenes:
+        raise RuntimeError("No scenes to concatenate.")
+
+    # Do not use the concat demuxer here. Some stock-video files carry bad
+    # timestamps/metadata that can make the assembled duration explode.
+    inputs=[]
+    filters=[]
+    for i,path in enumerate(scenes):
+        inputs += ["-i",str(path)]
+        filters.append(
+            f"[{i}:v:0]setpts=PTS-STARTPTS,trim=duration=99999,"
+            f"scale=1080:1920:force_original_aspect_ratio=increase,"
+            f"crop=1080:1920,setsar=1,fps=30,format=yuv420p[v{i}]"
+        )
+    labels="".join(f"[v{i}]" for i in range(len(scenes)))
+    filters.append(f"{labels}concat=n={len(scenes)}:v=1:a=0,setpts=PTS-STARTPTS[v]")
+    subprocess.run(
+        ["ffmpeg","-y",*inputs,"-filter_complex",";".join(filters),"-map","[v]",
+         "-an","-c:v","libx264","-preset","medium","-crf","18","-pix_fmt","yuv420p",
+         "-r","30","-fps_mode","cfr",str(output)],
+        check=True
     )
-    subprocess.run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(listing),
-        "-an","-vf","setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,format=yuv420p",
-        "-r","30","-fps_mode","cfr","-c:v","libx264","-preset","medium","-crf","18",str(output)],check=True)
 
 
 def add_voice(video: Path,voice: Path,output: Path):
-    subprocess.run(["ffmpeg","-y","-i",str(video),"-i",str(voice),"-map","0:v:0","-map","1:a:0",
-        "-c:v","copy","-c:a","aac","-b:a","192k","-shortest",str(output)],check=True)
+    # Explicitly match video to narration duration. Do not let -shortest decide
+    # which stream wins when source timestamps are unusual.
+    subprocess.run([
+        "ffmpeg","-y","-i",str(video),"-i",str(voice),
+        "-map","0:v:0","-map","1:a:0",
+        "-c:v","copy","-c:a","aac","-b:a","192k",
+        "-af","apad","-shortest",str(output)
+    ],check=True)
 
 
 def apply_ranking_overlay(video: Path, storyboard: dict, output: Path, total_duration: float):
@@ -92,25 +111,36 @@ def apply_ranking_overlay(video: Path, storyboard: dict, output: Path, total_dur
     ass_path=output.with_suffix(".ass")
     _write_ranking_ass(ass_path,storyboard.get("title") or "TOP 5",entries,per_scene,total_duration)
 
-    # The runner's FFmpeg build has libass but no drawtext. ASS gives us the
-    # persistent leaderboard + timed active highlight without depending on
-    # libfreetype/drawtext.
-    vf=f"drawbox=x=28:y=190:w=490:h=1120:color=black@0.48:t=fill,ass=filename={ass_path.resolve()}"
-    subprocess.run(["ffmpeg","-y","-i",str(video),"-vf",vf,"-c:v","libx264","-preset","medium",
-        "-crf","18","-pix_fmt","yuv420p","-an",str(output)],check=True)
+    # No solid background panel: the leaderboard is transparent text over the
+    # actual footage. Only the active row changes color.
+    vf=f"ass=filename={ass_path.resolve()}"
+    subprocess.run([
+        "ffmpeg","-y","-i",str(video),"-vf",vf,
+        "-c:v","libx264","-preset","medium","-crf","18",
+        "-pix_fmt","yuv420p","-an",str(output)
+    ],check=True)
 
 
 def final_master(video: Path,output: Path):
-    subprocess.run(["ffmpeg","-y","-i",str(video),
+    subprocess.run([
+        "ffmpeg","-y","-i",str(video),
         "-vf","eq=contrast=1.04:saturation=1.06:brightness=0.01,unsharp=5:5:0.35",
-        "-c:v","libx264","-preset","medium","-crf","17","-c:a","aac","-b:a","192k",
-        "-movflags","+faststart",str(output)],check=True)
+        "-c:v","libx264","-preset","medium","-crf","17",
+        "-c:a","aac","-b:a","192k","-movflags","+faststart",str(output)
+    ],check=True)
 
 
 def validate(video: Path)->dict:
     import json
-    raw=subprocess.check_output(["ffprobe","-v","error","-show_entries","stream=width,height,codec_name,duration",
-        "-of","json",str(video)],text=True)
+    raw=subprocess.check_output([
+        "ffprobe","-v","error","-show_entries","stream=width,height,codec_name,duration",
+        "-of","json",str(video)
+    ],text=True)
     v=next(s for s in json.loads(raw)["streams"] if s.get("width"))
-    return {"width":v["width"],"height":v["height"],"codec":v["codec_name"],
-            "duration":float(v.get("duration") or 0),"vertical":v["height"]>v["width"]}
+    return {
+        "width":v["width"],
+        "height":v["height"],
+        "codec":v["codec_name"],
+        "duration":float(v.get("duration") or 0),
+        "vertical":v["height"]>v["width"]
+    }
