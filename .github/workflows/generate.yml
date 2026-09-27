@@ -1,0 +1,41 @@
+name: Generate Viral Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Topic for the video"
+        required: true
+        type: string
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+      - name: Dependencies
+        run: pip install -r requirements.txt
+      - name: Generate
+        env:
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_VIDEO_URL: ${{ secrets.DISCORD_WEBHOOK_VIDEO_URL }}
+        run: python main.py --topic "${{ inputs.topic }}"
+      - name: Upload generated video
+        uses: actions/upload-artifact@v4
+        with:
+          name: viral-video
+          path: output/**
+          if-no-files-found: error
+          retention-days: 7
