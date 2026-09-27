@@ -51,7 +51,7 @@ Create a {VIDEO_SCENES}-scene vertical short.\nFormat: {"ranking" if is_ranking_
 The narration should be 90-130 words.
 The first sentence must create immediate curiosity.
 The first scene must be a strong visual hook, not generic b-roll.
-Every scene must have a distinct visual event and move the story forward.
+Every scene must have a distinct moving visual event and move the story forward. Each scene must be usable as a stock VIDEO search query, not an image search query.
 The last scene should visually echo the first for a seamless loop.
 Return JSON keys: title, hook, script, scenes."""
     url="https://generativelanguage.googleapis.com/v1beta/models/"+GEMINI_MODEL+":generateContent"
