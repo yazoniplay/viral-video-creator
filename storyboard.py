@@ -1,14 +1,15 @@
-
 import json
 from typing import Any
 import requests
 from config import GEMINI_API_KEY, GEMINI_MODEL, VIDEO_SCENES
 
 SYSTEM = """You are a senior short-form video creative director.
-Create original, high-retention vertical video concepts.
-Every scene must be visually generatable by a text-to-video model.
+Create original, high-retention vertical video concepts designed to be genuinely watchable.
+Every scene must use VIDEO FOOTAGE ONLY. Never request still images, image slideshows, screenshots, illustrations, photo montages, or static graphics as the visual.
+For stock-footage scenes, every visual prompt must describe a concrete subject and moving action that can be searched as a real stock VIDEO clip on Pexels.
 Avoid copyrighted characters, logos and watermarks.
-Make the first 2 seconds visually decisive and the final scene loop naturally.
+For ranking videos, create a persistent leaderboard: ranks are displayed visually from 1 at the top to 5 at the bottom, but the actual clips play from 5 to 1. All five entries remain visible for the entire video; only the active row is highlighted.
+The ranking should feel like an actual editorial ranking with distinct named entries, not generic labels.
 Return only valid JSON."""
 
 def is_ranking_topic(topic: str) -> bool:
@@ -19,24 +20,46 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
     ranking=is_ranking_topic(topic)
     hook=hook_override or (f"These are the moments that deserve the top spots in {topic}." if ranking else f"You probably don't know this about {topic}.")
     if ranking:
-        rank_prompts=[
-            ("countdown opener","A fast vertical countdown intro for {topic}; giant number 5, energetic motion, bold graphic shapes, visual punch, no logos."),
-            ("rank 5","Visualize the #5 entry for {topic}; a distinct funny/action scenario, large #5 badge, freeze-frame style moment, dynamic camera, no logos."),
-            ("rank 4","Visualize the #4 entry for {topic}; completely different comedic/action scenario, large #4 badge, dynamic camera, expressive motion, no logos."),
-            ("rank 3","Visualize the #3 entry for {topic}; escalating absurd or funny scenario, large #3 badge, dramatic reveal, dynamic camera, no logos."),
-            ("rank 2","Visualize the #2 entry for {topic}; high-energy standout scenario, large #2 badge, fast push-in, strong visual payoff, no logos."),
-            ("rank 1","Visualize the #1 entry for {topic}; biggest payoff, large #1 badge, celebratory ending that can loop into the countdown opener, no logos.")
+        count=5
+        names=[
+            "The Warm-Up",
+            "The Clean Landing",
+            "The Near Miss",
+            "The Impossible Gap",
+            "The Perfect Run",
         ]
-        scenes=[{"duration":5,"purpose":p,"camera":"dynamic","prompt":x.format(topic=topic),"continuity":"Each rank must have a visibly different composition and event."} for p,x in rank_prompts[:VIDEO_SCENES]]
-        script=f"Here are the top moments in {topic}. Number five starts the countdown. Number four gets even better. Number three is where things get ridiculous. Number two is almost impossible to beat. And number one takes the top spot. Which one would you put first?"
-        return {"title":topic,"hook":hook,"script":script,"format":"ranking","scenes":scenes}
+        rank_entries=[{"rank":i,"name":names[5-i]} for i in range(1,6)]
+        rank_to_prompt={
+            5:"a simple but impressive parkour movement with a clean landing",
+            4:"a fast parkour run with a more difficult obstacle",
+            3:"a technical parkour sequence with a risky-looking but controlled jump",
+            2:"an extremely difficult parkour gap with a dramatic landing",
+            1:"an extraordinary parkour sequence with a spectacular clean finish"
+        }
+        scenes=[]
+        for playback_rank in range(5,0,-1):
+            entry=next(x for x in rank_entries if x["rank"]==playback_rank)
+            scenes.append({
+                "duration":5,
+                "purpose":f"rank {playback_rank}",
+                "rank":playback_rank,
+                "name":entry["name"],
+                "camera":"dynamic handheld tracking",
+                "prompt":f"Realistic vertical stock VIDEO footage of {rank_to_prompt[playback_rank]}, continuous visible motion, athletic movement, clear beginning and landing, no text, no logos."
+            })
+        script=(f"Here are five {topic}. At number five, we start with a solid run. Number four raises the difficulty. "
+                f"Number three is where the jumps get seriously technical. Number two is almost unbelievable. "
+                f"And number one is the cleanest and most impressive of them all.")
+        return {"title":topic,"hook":hook,"script":script,"format":"ranking","ranking_count":5,
+                "ranking_entries":rank_entries,"scenes":scenes}
+
     prompts=[
-        ("instant visual hook","fast push-in",f"Cinematic vertical opening shot about {topic}; visually surprising subject, immediate motion, strong depth, realistic lighting, premium documentary style, no text, no logos."),
-        ("establish context","lateral tracking",f"Vertical cinematic scene explaining the world around {topic}; clear central subject, layered foreground and background, natural motion, photorealistic, no text, no logos."),
-        ("first key idea","controlled orbit",f"Vertical cinematic visualization of the first important idea behind {topic}; show the concept physically through action rather than labels, highly detailed, realistic motion, no text."),
-        ("escalation","low-angle tracking",f"High-energy vertical cinematic visualization connected to {topic}; increasing scale and motion, dramatic but believable, premium lighting, no text, no logos."),
-        ("surprising payoff","rapid reveal then close-up",f"Visually surprising reveal connected to {topic}; clear cause and effect, cinematic realism, strong contrast and depth, no text."),
-        ("loopable ending","slow pull-back",f"Beautiful final vertical shot about {topic} that echoes the opening composition, cinematic realism, smooth motion, no text, no logos.")
+        ("instant visual hook","fast push-in",f"Realistic vertical stock VIDEO footage about {topic}; immediate physical action, surprising subject, clear motion, no text, no logos."),
+        ("establish context","lateral tracking",f"Realistic vertical stock VIDEO footage showing the world around {topic}; concrete subject performing a visible action, natural motion, no text, no logos."),
+        ("first key idea","controlled orbit",f"Realistic vertical stock VIDEO footage demonstrating the first important idea behind {topic} through a physical action, detailed and believable, no text."),
+        ("escalation","low-angle tracking",f"Realistic vertical stock VIDEO footage connected to {topic}; increasing scale and motion, dramatic but believable action, no text, no logos."),
+        ("surprising payoff","rapid reveal then close-up",f"Realistic vertical stock VIDEO footage of a surprising reveal connected to {topic}; clear cause and effect, visible movement, no text."),
+        ("loopable ending","slow pull-back",f"Realistic vertical stock VIDEO footage about {topic} that echoes the opening subject and motion, smooth movement, no text, no logos.")
     ]
     scenes=[{"duration":5,"purpose":p,"camera":c,"prompt":x,"continuity":"Keep visual language and the main subject coherent."} for p,c,x in prompts[:VIDEO_SCENES]]
     while len(scenes)<VIDEO_SCENES: scenes.append(scenes[-1].copy())
@@ -45,37 +68,78 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
 def create_storyboard(topic: str, hook_override: str | None = None) -> dict[str, Any]:
     if not GEMINI_API_KEY:
         return fallback(topic, hook_override)
+    ranking=is_ranking_topic(topic)
     prompt=f"""Topic: {topic}
 Preferred hook: {hook_override or "create the strongest curiosity hook yourself"}
-Create a {VIDEO_SCENES}-scene vertical short.\nFormat: {"ranking" if is_ranking_topic(topic) else "explainer"}. If this is a ranking/countdown, each scene must represent a different rank and use a different visual composition.
-The narration should be 90-130 words.
-The first sentence must create immediate curiosity.
-The first scene must be a strong visual hook, not generic b-roll.
-Every scene must have a distinct moving visual event and move the story forward. Each scene must be usable as a stock VIDEO search query, not an image search query.
-The last scene should visually echo the first for a seamless loop.
-Return JSON keys: title, hook, script, scenes."""
+Create a short vertical video. Format: {"ranking" if ranking else "explainer"}.
+
+If ranking format:
+- Rank exactly 5 entries.
+- Return ranking_entries with exactly five objects containing rank and name.
+- The leaderboard order is ALWAYS 1, 2, 3, 4, 5 from top to bottom.
+- Playback order is ALWAYS 5, 4, 3, 2, 1.
+- All five rows stay visible for the entire video.
+- Each scene must contain rank and name matching its entry.
+- Scenes must be returned in playback order: 5, 4, 3, 2, 1.
+- Give each entry a short, interesting name that actually describes what is being ranked.
+- Make the #1 entry the strongest payoff.
+- Never ask the stock-video search for text, number badges, UI, logos, or graphics; the renderer adds the leaderboard.
+
+For every video:
+- Write 90-130 words of natural spoken narration.
+- The first sentence must create immediate curiosity.
+- Every scene must describe a distinct moving VIDEO event.
+- Every scene prompt must work as a real Pexels stock VIDEO search query.
+- Never request still images or static graphics.
+- Keep the visuals tightly connected to what is being said.
+Return JSON keys: title, hook, script, format, ranking_entries, scenes."""
+
     url="https://generativelanguage.googleapis.com/v1beta/models/"+GEMINI_MODEL+":generateContent"
     try:
         response=requests.post(url,headers={"x-goog-api-key":GEMINI_API_KEY,"Content-Type":"application/json"},json={
-        "systemInstruction":{"parts":[{"text":SYSTEM}]},
-        "contents":[{"parts":[{"text":prompt}]}],
-        "generationConfig":{"temperature":0.95,"responseMimeType":"application/json"}
-    },timeout=90)
+            "systemInstruction":{"parts":[{"text":SYSTEM}]},
+            "contents":[{"parts":[{"text":prompt}]}],
+            "generationConfig":{"temperature":0.95,"responseMimeType":"application/json"}
+        },timeout=90)
         response.raise_for_status()
         text=response.json()["candidates"][0]["content"]["parts"][0]["text"]
         result=json.loads(text)
         scenes=result.get("scenes", [])
-        # Normalize model output so the renderer always receives the fields it needs.
         normalized=[]
-        for i, scene in enumerate(scenes[:VIDEO_SCENES], 1):
-            if not isinstance(scene, dict):
+        for i,scene in enumerate(scenes,1):
+            if not isinstance(scene,dict):
                 continue
             purpose=str(scene.get("purpose") or scene.get("title") or f"Scene {i}")
             prompt_text=scene.get("prompt") or scene.get("visual_prompt") or scene.get("description") or purpose
-            normalized.append({**scene, "purpose": purpose, "prompt": str(prompt_text), "duration": int(scene.get("duration", 5) or 5)})
-        if len(normalized) == VIDEO_SCENES:
-            result["scenes"] = normalized
-            result["format"] = result.get("format") or ("ranking" if is_ranking_topic(topic) else "explainer")
+            normalized.append({**scene,"purpose":purpose,"prompt":str(prompt_text),"duration":int(scene.get("duration",5) or 5)})
+        if ranking:
+            entries=result.get("ranking_entries") or []
+            clean=[]
+            for entry in entries:
+                if isinstance(entry,dict) and str(entry.get("name","")).strip():
+                    try: rank=int(entry.get("rank"))
+                    except (TypeError,ValueError): continue
+                    if 1 <= rank <= 5: clean.append({"rank":rank,"name":str(entry["name"]).strip()})
+            clean=sorted({x["rank"]:x for x in clean}.values(),key=lambda x:x["rank"])
+            if len(clean)!=5 or len(normalized)!=5:
+                return fallback(topic,hook_override)
+            by_rank={int(s.get("rank",0)):s for s in normalized}
+            if any(rank not in by_rank for rank in range(1,6)):
+                return fallback(topic,hook_override)
+            ordered=[]
+            for rank in range(5,0,-1):
+                s=dict(by_rank[rank])
+                entry=next(x for x in clean if x["rank"]==rank)
+                s["rank"]=rank
+                s["name"]=entry["name"]
+                ordered.append(s)
+            result["scenes"]=ordered
+            result["ranking_entries"]=clean
+            result["format"]="ranking"
+            return result
+        if len(normalized)==VIDEO_SCENES:
+            result["scenes"]=normalized
+            result["format"]=result.get("format") or "explainer"
             return result
         return fallback(topic,hook_override)
     except (requests.RequestException, KeyError, IndexError, json.JSONDecodeError) as exc:
