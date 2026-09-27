@@ -1,27 +1,64 @@
 # Viral Video Creator
 
-AI-first automated vertical video production.
+AI-first autonomous vertical video production.
+
+## What it does
+
+The system now runs in two modes:
+
+- Manual: give it a topic.
+- Autopilot: discover fresh short-form topics, choose one, generate multiple hooks, write the story, generate every scene with AI video, add voice/captions, run QC, and report the result to Discord.
 
 Pipeline:
-topic -> AI creative director -> storyboard -> **AI text-to-video scenes** -> voiceover -> captions -> mastering -> QC -> Discord.
 
-The primary renderer generates the visuals itself. It does not scrape random web videos.
+trend discovery -> topic selection -> hook variants -> AI creative director -> storyboard -> AI text-to-video scenes -> voiceover -> captions -> mastering -> QC -> Discord.
+
+The primary renderer generates the visuals itself. It does not depend on random stock footage.
 
 ## Setup
 
 Requires Python 3.11+ and FFmpeg.
 
     pip install -r requirements.txt
+
+Set:
+
+- FAL_KEY — required for AI video generation.
+- GEMINI_API_KEY — recommended for stronger scripts/storyboards.
+- YOUTUBE_API_KEY — optional for fresh YouTube Shorts trend discovery.
+- DISCORD_WEBHOOK_URL — pipeline events.
+- DISCORD_WEBHOOK_VIDEO_URL — final-video events.
+
+### Manual
+
     python main.py --topic "Why phones are becoming insanely powerful"
 
-Set FAL_KEY. Optional GEMINI_API_KEY upgrades the fallback storyboard into an AI creative director.
+### Autonomous
 
-The default provider is MiniMax H3 Max through fal.ai. The provider is isolated in ai_video.py so another model can be added later.
+    python main.py --autopilot
 
-## Discord
+If no YouTube API key is configured, the autopilot uses a small safe fallback topic pool rather than scraping arbitrary videos.
 
-Use DISCORD_WEBHOOK_URL for pipeline events and DISCORD_WEBHOOK_VIDEO_URL for final-video events.
+## GitHub Actions
+
+The workflow supports:
+
+- manual workflow_dispatch with an optional topic
+- scheduled autonomous generation every 6 hours
+- artifact upload of the complete run
+
+Add the secrets above in the repository settings. YOUTUBE_API_KEY is optional; the other generation keys are used by the production pipeline.
 
 ## Output
 
-Every run creates AI-generated scene MP4s, storyboard.json, voice.mp3, captions.srt, final.mp4 and manifest.json.
+Every run creates a timestamped directory containing:
+
+- AI-generated scene MP4s
+- trend.json when autopilot is used
+- storyboard.json
+- voice.mp3
+- captions.srt
+- final.mp4
+- manifest.json
+
+The manifest records the selected trend, hook variants, generation mode, scene metadata, and final QC.
