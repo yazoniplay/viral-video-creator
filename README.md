@@ -1,19 +1,25 @@
 # Viral Video Creator
 
-AI-first autonomous vertical video production.
+A zero-cost-first autonomous vertical video creator.
 
 ## What it does
 
-The system now runs in two modes:
-
-- Manual: give it a topic.
-- Autopilot: discover fresh short-form topics, choose one, generate multiple hooks, write the story, generate every scene with AI video, add voice/captions, run QC, and report the result to Discord.
+The pipeline creates the **visuals itself locally** instead of paying for a text-to-video API or downloading random stock clips.
 
 Pipeline:
 
-trend discovery -> topic selection -> hook variants -> AI creative director -> storyboard -> AI text-to-video scenes -> voiceover -> captions -> mastering -> QC -> Discord.
+trend discovery -> hook selection -> creative director -> storyboard -> locally generated motion scenes -> Edge TTS voice -> captions -> mastering -> QC -> Discord.
 
-The primary renderer generates the visuals itself. It does not depend on random stock footage.
+### $0 core
+
+- Local procedural visuals with Pillow + FFmpeg
+- Edge TTS for narration
+- FFmpeg for animation, assembly and mastering
+- No fal.ai key
+- No paid video-generation API
+- No stock-footage subscription
+
+Gemini and YouTube are optional. If Gemini is unavailable, the storyboard has a local fallback. If YouTube API access is unavailable, autopilot uses its fallback topic pool.
 
 ## Setup
 
@@ -21,44 +27,31 @@ Requires Python 3.11+ and FFmpeg.
 
     pip install -r requirements.txt
 
-Set:
+No FAL_KEY is required.
 
-- FAL_KEY — required for AI video generation.
-- GEMINI_API_KEY — recommended for stronger scripts/storyboards.
-- YOUTUBE_API_KEY — optional for fresh YouTube Shorts trend discovery.
+Optional environment variables:
+
+- GEMINI_API_KEY — stronger scripts/storyboards.
+- YOUTUBE_API_KEY — fresh YouTube trend discovery.
 - DISCORD_WEBHOOK_URL — pipeline events.
 - DISCORD_WEBHOOK_VIDEO_URL — final-video events.
 
-### Manual
+Run manually:
 
     python main.py --topic "Why phones are becoming insanely powerful"
 
-### Autonomous
+Run autonomous:
 
     python main.py --autopilot
 
-If no YouTube API key is configured, the autopilot uses a small safe fallback topic pool rather than scraping arbitrary videos.
-
 ## GitHub Actions
 
-The workflow supports:
-
-- manual workflow_dispatch with an optional topic
-- scheduled autonomous generation every 6 hours
-- artifact upload of the complete run
-
-Add the secrets above in the repository settings. YOUTUBE_API_KEY is optional; the other generation keys are used by the production pipeline.
+The workflow can run manually or every 6 hours. The generated run is uploaded as a GitHub Actions artifact.
 
 ## Output
 
-Every run creates a timestamped directory containing:
+Each run contains generated scene MP4s, storyboard JSON, voiceover, captions, final.mp4 and manifest.json.
 
-- AI-generated scene MP4s
-- trend.json when autopilot is used
-- storyboard.json
-- voice.mp3
-- captions.srt
-- final.mp4
-- manifest.json
+## Important
 
-The manifest records the selected trend, hook variants, generation mode, scene metadata, and final QC.
+This is a **motion-graphics renderer**, not a photorealistic text-to-video model. It deliberately trades photorealistic AI footage for a genuinely $0 pipeline that can run on GitHub Actions without paid video APIs.
