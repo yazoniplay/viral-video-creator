@@ -1,38 +1,36 @@
-import base64
 from pathlib import Path
-import requests
-from config import ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, ELEVENLABS_MODEL
 
-API = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+import soundfile as sf
+from kokoro import KPipeline
+import numpy as np
+
+_PIPELINE = None
+
+def _get_pipeline():
+    global _PIPELINE
+    if _PIPELINE is None:
+        print("[tts] loading local Kokoro TTS...")
+        _PIPELINE = KPipeline(lang_code="a")
+    return _PIPELINE
 
 def make_voiceover(text: str, output_path: Path):
-    if not ELEVENLABS_API_KEY:
-        raise RuntimeError("ELEVENLABS_API_KEY is missing. Add your ElevenLabs API key to GitHub Actions secrets.")
-    if not ELEVENLABS_VOICE_ID:
-        raise RuntimeError("ELEVENLABS_VOICE_ID is missing. Add the ElevenLabs voice ID to GitHub Actions secrets.")
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    url = API.format(voice_id=ELEVENLABS_VOICE_ID)
-    response = requests.post(
-        url,
-        headers={
-            "xi-api-key": ELEVENLABS_API_KEY,
-            "Content-Type": "application/json",
-            "Accept": "audio/mpeg",
-        },
-        params={"output_format": "mp3_44100_128"},
-        json={
-            "text": text,
-            "model_id": ELEVENLABS_MODEL or "eleven_flash_v2_5",
-            "voice_settings": {
-                "stability": 0.38,
-                "similarity_boost": 0.82,
-                "style": 0.35,
-                "use_speaker_boost": True,
-            },
-        },
-        timeout=120,
+    pipeline = _get_pipeline()
+    chunks = []
+
+    generator = pipeline(
+        text,
+        voice="af_heart",
+        speed=1.05,
+        split_pattern=r"\n+",
     )
-    if not response.ok:
-        raise RuntimeError(f"ElevenLabs TTS failed ({response.status_code}): {response.text[:1200]}")
-    output_path.write_bytes(response.content)
+
+    for _, _, audio in generator:
+        chunks.append(audio)
+
+    if not chunks:
+        raise RuntimeError("Kokoro TTS produced no audio.")
+
+    audio = np.concatenate(chunks)
+    sf.write(output_path, audio, 24000, format="WAV")
+    print(f"[tts] wrote {output_path}")
