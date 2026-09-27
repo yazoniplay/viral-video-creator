@@ -3,7 +3,7 @@ from config import OUTPUT_DIR,validate
 from storyboard import create_storyboard
 from ai_video import generate_scene
 from audio import make_voiceover
-from captions import make_srt,burn_captions
+from captions import make_srt,burn_captions,duration as media_duration
 from render import concat_scenes,add_voice,final_master,validate as validate_video
 from discord_notify import stage,completed
 
@@ -21,14 +21,22 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         (root/"trend.json").write_text(json.dumps(selected_trend,indent=2),encoding="utf-8")
         stage("Trend selected","Autopilot selected a fresh short-form topic.",source=selected_trend.get("source",""),score=selected_trend.get("score",0))
     stage("Storyboard ready","Creative director produced the story and shot list.",hook=storyboard.get("hook",""),scenes=len(storyboard["scenes"]))
+    # Generate narration first so visuals match the actual script duration.
+    voice=root/"voice.mp3"; make_voiceover(storyboard["script"],voice)
+    narration_duration=media_duration(voice)
+    # Give the visual timeline a small buffer so -shortest ends on the final spoken word.
+    visual_duration=narration_duration+0.75
+    per_scene=visual_duration/max(len(storyboard["scenes"]),1)
+
     scene_paths=[]; scene_meta=[]
     for index,scene in enumerate(storyboard["scenes"],1):
-        stage("Rendering scene",f"Local generated visual {index}/{len(storyboard['scenes'])}.",scene=index,purpose=scene.get("purpose",""))
+        scene=dict(scene)
+        scene["duration"]=round(per_scene,3)
+        stage("Rendering scene",f"Pexels visual {index}/{len(storyboard['scenes'])} ({scene['duration']}s).",scene=index,purpose=scene.get("purpose",""))
         path=scenes_dir/f"scene_{index:02d}.mp4"
-        meta=generate_scene(scene["prompt"],path,topic=topic,scene=scene,index=index)
+        meta=generate_scene(scene["prompt"],path,topic=topic,scene=scene,index=index,duration=scene["duration"])
         scene_paths.append(path); scene_meta.append({**scene,**meta})
     raw=root/"assembled.mp4"; concat_scenes(scene_paths,raw)
-    voice=root/"voice.mp3"; make_voiceover(storyboard["script"],voice)
     voiced=root/"voiced.mp4"; add_voice(raw,voice,voiced)
     srt=root/"captions.srt"; make_srt(storyboard["script"],voice,srt)
     captioned=root/"captioned.mp4"; burn_captions(voiced,srt,captioned)
