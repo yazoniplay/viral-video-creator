@@ -50,10 +50,9 @@ def make_scene(topic: str, scene: dict, index: int, output: Path) -> dict:
     if not files:
         raise RuntimeError(f"Pexels returned no downloadable MP4 for video {video.get('id')}")
 
+    output.parent.mkdir(parents=True, exist_ok=True)
     source = output.with_suffix(".source.mp4")
     _download(files[0]["link"], source)
-
-    output.parent.mkdir(parents=True, exist_ok=True)
     duration = VIDEO_SCENE_SECONDS
     vf = (
         f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
