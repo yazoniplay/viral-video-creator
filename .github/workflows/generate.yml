@@ -28,10 +28,10 @@ jobs:
       - name: TTS runtime
         run: sudo apt-get update && sudo apt-get install -y espeak-ng
 
-      - name: Verify FFmpeg drawtext
+      - name: Verify FFmpeg subtitle rendering
         run: |
-          if ! ffmpeg -hide_banner -filters | grep -E '(^|[[:space:]])drawtext([[:space:]]|$)'; then
-            echo "drawtext filter is missing from the FFmpeg binary"
+          if ! ffmpeg -hide_banner -filters | grep -E '(^|[[:space:]])ass([[:space:]]|$)'; then
+            echo "ASS subtitle filter is missing from the FFmpeg binary"
             ffmpeg -hide_banner -filters
             exit 1
           fi
