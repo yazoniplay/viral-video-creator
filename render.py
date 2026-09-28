@@ -84,15 +84,21 @@ def concat_scenes(scenes: list[Path], output: Path):
     )
 
 
-def add_voice(video: Path,voice: Path,output: Path):
-    # Explicitly match video to narration duration. Do not let -shortest decide
-    # which stream wins when source timestamps are unusual.
-    subprocess.run([
+def add_voice(video: Path,voice: Path,output: Path,duration: float | None = None):
+    # Keep the full visual timeline. Ranking videos have a short hook, so pad
+    # the audio with silence instead of shortening the countdown.
+    args=[
         "ffmpeg","-y","-i",str(video),"-i",str(voice),
         "-map","0:v:0","-map","1:a:0",
-        "-c:v","copy","-c:a","aac","-b:a","192k",
-        "-shortest",str(output)
-    ],check=True)
+        "-c:v","copy","-c:a","aac","-b:a","128k",
+        "-af","apad"
+    ]
+    if duration is not None:
+        args += ["-t",str(duration)]
+    else:
+        args += ["-shortest"]
+    args += [str(output)]
+    subprocess.run(args,check=True)
 
 
 def apply_ranking_overlay(video: Path, storyboard: dict, output: Path, total_duration: float):
