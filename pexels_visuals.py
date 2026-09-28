@@ -47,7 +47,11 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
 
     query = _query(topic, scene)
     headers = {"Authorization": PEXELS_API_KEY}
-    params = {"query": query, "orientation": "portrait", "size": "medium", "per_page": 15}
+    landscape = scene.get("aspect") == "landscape"
+    target_w = 1920 if landscape else VIDEO_WIDTH
+    target_h = 1080 if landscape else VIDEO_HEIGHT
+    orientation = "landscape" if landscape else "portrait"
+    params = {"query": query, "orientation": orientation, "size": "medium", "per_page": 15}
     r = requests.get(API, headers=headers, params=params, timeout=30)
     r.raise_for_status()
     videos = r.json().get("videos", [])
@@ -61,7 +65,8 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
 
     video = videos[(index - 1) % len(videos)]
     files = [x for x in video.get("video_files", []) if x.get("file_type") == "video/mp4" and x.get("link")]
-    files.sort(key=lambda x: (abs((x.get("height", 0) / max(x.get("width", 1), 1)) - 16/9), -(x.get("width", 0))))
+    target_ratio=target_w/max(target_h,1)
+    files.sort(key=lambda x: (abs((x.get("height", 0) / max(x.get("width", 1), 1)) - target_ratio), -(x.get("width", 0))))
     if not files:
         raise RuntimeError(f"Pexels returned no downloadable MP4 for video {video.get('id')}")
 
@@ -71,8 +76,8 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
     target_duration = float(duration or scene.get("duration") or VIDEO_SCENE_SECONDS)
     vf = (
         "setpts=PTS-STARTPTS,"
-        f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
-        f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
+        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+        f"crop={target_w}:{target_h},"
         "setsar=1,eq=saturation=1.08:contrast=1.03,"
         "fps=30,setpts=N/(30*TB)"
     )
