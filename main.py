@@ -18,9 +18,12 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     (root/"storyboard.json").write_text(json.dumps(storyboard,indent=2),encoding="utf-8")
     print(f"[pipeline] storyboard ready: {storyboard.get('format')} / {len(storyboard['scenes'])} scenes")
 
-    # Generate narration first so the visual timeline exactly follows the finished voice.
+    # Ranking videos use the hook only; other formats use the full script.
+    narration_text = storyboard.get("hook","") if storyboard.get("format") == "ranking" else storyboard.get("script","")
+    if not narration_text.strip():
+        raise ValueError("No narration text available for this video.")
     voice=root/"voice.wav"
-    make_voiceover(storyboard["script"],voice)
+    make_voiceover(narration_text,voice)
     narration_duration=media_duration(voice)
     visual_duration=narration_duration+0.75
     per_scene=visual_duration/max(len(storyboard["scenes"]),1)
@@ -49,7 +52,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     add_voice(visual_master,voice,voiced)
 
     srt=root/"captions.srt"
-    make_srt(storyboard["script"],voice,srt)
+    make_srt(narration_text,voice,srt)
     captioned=root/"captioned.mp4"
     burn_captions(voiced,srt,captioned)
 
