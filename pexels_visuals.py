@@ -34,12 +34,31 @@ def _query(topic: str, scene: dict) -> str:
     return base or "luxury mansion architecture"
 
 def _download(url: str, path: Path):
-    with requests.get(url, stream=True, timeout=60) as r:
-        r.raise_for_status()
-        with path.open("wb") as f:
-            for chunk in r.iter_content(1024 * 1024):
-                if chunk:
-                    f.write(chunk)
+    # Pexels CDN connections can occasionally reset on GitHub-hosted runners.
+    # Retry the actual MP4 download instead of failing the whole render.
+    last_error = None
+    for attempt in range(5):
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "video/mp4,*/*",
+            }
+            with requests.get(url, headers=headers, stream=True, timeout=(15, 120)) as r:
+                r.raise_for_status()
+                with path.open("wb") as f:
+                    for chunk in r.iter_content(1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
+            if path.exists() and path.stat().st_size > 100_000:
+                return
+            raise RuntimeError("Pexels returned an empty video file")
+        except (requests.RequestException, OSError, RuntimeError) as exc:
+            last_error = exc
+            path.unlink(missing_ok=True)
+            if attempt < 4:
+                import time
+                time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"Failed to download Pexels video after 5 attempts: {last_error}")
 
 def make_scene(topic: str, scene: dict, index: int, output: Path, duration: float | None = None) -> dict:
     if not PEXELS_API_KEY:
