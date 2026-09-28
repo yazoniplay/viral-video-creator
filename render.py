@@ -91,7 +91,7 @@ def add_voice(video: Path,voice: Path,output: Path):
         "ffmpeg","-y","-i",str(video),"-i",str(voice),
         "-map","0:v:0","-map","1:a:0",
         "-c:v","copy","-c:a","aac","-b:a","192k",
-        "-af","apad","-shortest",str(output)
+        "-shortest",str(output)
     ],check=True)
 
 
