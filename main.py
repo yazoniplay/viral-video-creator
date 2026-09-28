@@ -4,7 +4,7 @@ from storyboard import create_storyboard
 from ai_video import generate_scene
 from audio import make_voiceover
 from captions import make_srt,burn_captions,duration as media_duration
-from render import concat_scenes,add_voice,apply_ranking_overlay,apply_tier_overlay,final_master,validate as validate_video
+from render import concat_scenes,add_voice,apply_ranking_overlay,apply_tier_overlay,apply_advanced_edit,final_master,validate as validate_video
 
 def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None, longform=False):
     validate()
@@ -64,6 +64,11 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
 
     voiced=root/"voiced.mp4"
     add_voice(visual_master,voice,voiced,duration=visual_duration)
+
+    # Advanced editorial pass: motion, punch-in feel and cinematic polish.
+    edited=root/"edited.mp4"
+    apply_advanced_edit(voiced,storyboard,edited)
+    visual_master=edited
 
     srt=root/"captions.srt"
     make_srt(narration_text,voice,srt)
