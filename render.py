@@ -184,11 +184,13 @@ def apply_ranking_overlay(video: Path, storyboard: dict, output: Path, total_dur
 
 
 def final_master(video: Path,output: Path):
+    # Premium finishing pass: subtle contrast, saturation, sharpening and
+    # stabilized frame pacing without making stock footage look overprocessed.
     subprocess.run([
         "ffmpeg","-y","-i",str(video),
-        "-vf","eq=contrast=1.04:saturation=1.06:brightness=0.01,unsharp=5:5:0.35",
+        "-vf","eq=contrast=1.045:saturation=1.07:brightness=0.008,unsharp=5:5:0.35,fps=30",
         "-c:v","libx264","-preset","veryfast","-crf","19","-threads","2",
-        "-c:a","aac","-b:a","192k","-movflags","+faststart",str(output)
+        "-c:a","aac","-b:a","160k","-movflags","+faststart",str(output)
     ],check=True)
 
 
