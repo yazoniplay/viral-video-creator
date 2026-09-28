@@ -4,7 +4,7 @@ from storyboard import create_storyboard
 from ai_video import generate_scene
 from audio import make_voiceover
 from captions import make_srt,burn_captions,duration as media_duration
-from render import concat_scenes,add_voice,apply_ranking_overlay,final_master,validate as validate_video
+from render import concat_scenes,add_voice,apply_ranking_overlay,apply_tier_overlay,final_master,validate as validate_video
 
 def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None, longform=False):
     validate()
@@ -30,7 +30,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     if storyboard.get("format") == "ranking":
         per_scene=5.0
         visual_duration=per_scene*len(storyboard["scenes"])
-    elif storyboard.get("format") == "longform":
+    elif storyboard.get("format") in ("longform","tierlist"):
         visual_duration=max(narration_duration+1.0, len(storyboard["scenes"])*6.0)
         per_scene=visual_duration/max(len(storyboard["scenes"]),1)
     else:
@@ -41,7 +41,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     for index,scene in enumerate(storyboard["scenes"],1):
         scene=dict(scene)
         scene["duration"]=round(per_scene,3)
-        scene["aspect"]="landscape" if storyboard.get("format")=="longform" else "vertical"
+        scene["aspect"]="landscape" if storyboard.get("format") in ("longform","tierlist") else "vertical"
         path=scenes_dir/f"scene_{index:02d}.mp4"
         print(f"[pipeline] rendering scene {index}/{len(storyboard['scenes'])}: {scene.get('purpose','')} ({scene['duration']}s)")
         meta=generate_scene(scene["prompt"],path,topic=topic,scene=scene,index=index,duration=scene["duration"])
@@ -49,14 +49,18 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         scene_meta.append({**scene,**meta})
 
     raw=root/"assembled.mp4"
-    concat_scenes(scene_paths,raw,width=1920 if storyboard.get("format")=="longform" else 1080,height=1080 if storyboard.get("format")=="longform" else 1920)
+    concat_scenes(scene_paths,raw,width=1920 if storyboard.get("format") in ("longform","tierlist") else 1080,height=1080 if storyboard.get("format") in ("longform","tierlist") else 1920)
 
-    # Ranking videos get a persistent 1→5 leaderboard while playback runs 5→1.
+    # Ranking and tier-list videos get persistent editorial overlays.
     visual_master=raw
     if storyboard.get("format")=="ranking":
         ranked=root/"ranked.mp4"
         apply_ranking_overlay(raw,storyboard,ranked,visual_duration)
         visual_master=ranked
+    elif storyboard.get("format")=="tierlist":
+        tiered=root/"tiered.mp4"
+        apply_tier_overlay(raw,storyboard,tiered,visual_duration)
+        visual_master=tiered
 
     voiced=root/"voiced.mp4"
     add_voice(visual_master,voice,voiced,duration=visual_duration)
@@ -70,7 +74,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     final_master(captioned,final)
 
     qc=validate_video(final)
-    expected=(1920,1080) if storyboard.get("format")=="longform" else (1080,1920)
+    expected=(1920,1080) if storyboard.get("format") in ("longform","tierlist") else (1080,1920)
     if (qc["width"],qc["height"])!=expected:
         raise RuntimeError(f"Final video failed {expected[0]}x{expected[1]} QC: "+str(qc))
 
@@ -82,6 +86,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         "hook_variants":storyboard.get("hook_variants",[]),
         "format":storyboard.get("format"),
         "ranking_entries":storyboard.get("ranking_entries",[]),
+        "tier_entries":storyboard.get("tier_entries",[]),
         "script":storyboard.get("script"),
         "trend":selected_trend,
         "scenes":scene_meta,
@@ -89,6 +94,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
             "mode":"pexels_stock_video",
             "voice":"kokoro_local",
             "ranking_overlay":storyboard.get("format")=="ranking",
+            "tier_overlay":storyboard.get("format")=="tierlist",
             "scene_count":len(scene_paths),
             "external_video_generation":False
         },
