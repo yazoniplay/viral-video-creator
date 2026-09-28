@@ -94,8 +94,9 @@ def _write_tier_ass(path: Path, title: str, entries: list[dict], per_scene: floa
         grouped_before=grouped[tier]
         pos=next((i for i,x in enumerate(grouped_before) if x is e or x.get("item")==e.get("item")),0)
         x=185+sum(min(300,max(150,26*len(str(x.get("item") or "Item"))+45)) for x in grouped_before[:pos])
-        start=index*per_scene
-        end=min(total_duration,(index+1)*per_scene)
+        item_start=(index//3)*per_scene
+        start=item_start
+        end=min(total_duration,item_start+3*per_scene)
         lines.append(f"Dialogue: 1,{_ass_time(start)},{_ass_time(end)},Active,,0,0,0,,{{\\pos({x},{y})}}{item}")
     path.write_text("\\n".join(lines)+"\\n",encoding="utf-8")
 
