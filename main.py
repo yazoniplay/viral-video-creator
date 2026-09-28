@@ -6,13 +6,13 @@ from audio import make_voiceover
 from captions import make_srt,burn_captions,duration as media_duration
 from render import concat_scenes,add_voice,apply_ranking_overlay,final_master,validate as validate_video
 
-def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None):
+def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None, longform=False):
     validate()
     run_id=time.strftime("%Y%m%d-%H%M%S")+"-"+uuid.uuid4().hex[:6]
     root=OUTPUT_DIR/run_id; scenes_dir=root/"scenes"; root.mkdir(parents=True,exist_ok=True)
     print(f"[pipeline] started: {topic}")
 
-    storyboard=create_storyboard(topic,hook_override)
+    storyboard=create_storyboard(topic,hook_override,longform=longform)
     if hook_override: storyboard["hook"]=hook_override
     storyboard["hook_variants"]=hook_variants or [storyboard.get("hook","")]
     (root/"storyboard.json").write_text(json.dumps(storyboard,indent=2),encoding="utf-8")
@@ -30,6 +30,9 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     if storyboard.get("format") == "ranking":
         per_scene=5.0
         visual_duration=per_scene*len(storyboard["scenes"])
+    elif storyboard.get("format") == "longform":
+        visual_duration=max(narration_duration+1.0, len(storyboard["scenes"])*6.0)
+        per_scene=visual_duration/max(len(storyboard["scenes"]),1)
     else:
         visual_duration=narration_duration+0.75
         per_scene=visual_duration/max(len(storyboard["scenes"]),1)
@@ -38,6 +41,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     for index,scene in enumerate(storyboard["scenes"],1):
         scene=dict(scene)
         scene["duration"]=round(per_scene,3)
+        scene["aspect"]="landscape" if storyboard.get("format")=="longform" else "vertical"
         path=scenes_dir/f"scene_{index:02d}.mp4"
         print(f"[pipeline] rendering scene {index}/{len(storyboard['scenes'])}: {scene.get('purpose','')} ({scene['duration']}s)")
         meta=generate_scene(scene["prompt"],path,topic=topic,scene=scene,index=index,duration=scene["duration"])
@@ -45,7 +49,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         scene_meta.append({**scene,**meta})
 
     raw=root/"assembled.mp4"
-    concat_scenes(scene_paths,raw)
+    concat_scenes(scene_paths,raw,width=1920 if storyboard.get("format")=="longform" else 1080,height=1080 if storyboard.get("format")=="longform" else 1920)
 
     # Ranking videos get a persistent 1→5 leaderboard while playback runs 5→1.
     visual_master=raw
@@ -66,8 +70,9 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     final_master(captioned,final)
 
     qc=validate_video(final)
-    if not(qc["vertical"] and qc["width"]==1080 and qc["height"]==1920):
-        raise RuntimeError("Final video failed 1080x1920 vertical QC: "+str(qc))
+    expected=(1920,1080) if storyboard.get("format")=="longform" else (1080,1920)
+    if (qc["width"],qc["height"])!=expected:
+        raise RuntimeError(f"Final video failed {expected[0]}x{expected[1]} QC: "+str(qc))
 
     manifest={
         "run_id":run_id,
@@ -99,13 +104,14 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser(description="Generate an original vertical short.")
     parser.add_argument("--topic",help="Topic to generate. Omit for autonomous trend mode.")
     parser.add_argument("--autopilot",action="store_true",help="Discover a fresh topic and generate automatically.")
+    parser.add_argument("--longform",action="store_true",help="Generate a landscape long-form YouTube video.")
     args=parser.parse_args()
     try:
         if args.autopilot or not args.topic:
             from autopilot import run
             print("VIDEO_READY="+str(run()))
         else:
-            print("VIDEO_READY="+str(build(args.topic)))
+            print("VIDEO_READY="+str(build(args.topic,longform=args.longform)))
     except Exception as exc:
         print("ERROR:",exc,file=sys.stderr)
         raise
