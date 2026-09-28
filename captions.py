@@ -18,12 +18,18 @@ def make_srt(text:str,audio:Path,output:Path):
     lines=[]
     for i,chunk in enumerate(chunks):
         lines += [str(i+1),f"{stamp(i*slot)} --> {stamp(min(total,(i+1)*slot))}"," ".join(chunk),""]
-    output.write_text("\\n".join(lines),encoding="utf-8")
+    output.write_text("\n".join(lines),encoding="utf-8")
 
 def burn_captions(video:Path,srt:Path,output:Path):
-    subtitle=str(srt).replace("\\\\","/").replace(":","\\:")
+    if not srt.exists():
+        raise FileNotFoundError(f"Caption file was not created: {srt}")
+
+    # libass resolves subtitle files more reliably from an absolute path.
+    # Escape characters that have meaning inside the FFmpeg subtitles filter.
+    subtitle=srt.resolve().as_posix().replace("\\","\\\\").replace("'", "\\'")
     vf=f"subtitles='{subtitle}':force_style='FontName=Arial,FontSize=20,Bold=1,Outline=3,Alignment=2,MarginV=70'"
-    print("[captions] burning subtitles into video...",flush=True)
+
+    print(f"[captions] burning subtitles from {srt.resolve()}...",flush=True)
     subprocess.run([
         "ffmpeg","-y","-i",str(video),"-vf",vf,
         "-c:v","libx264","-preset","veryfast","-crf","20",
