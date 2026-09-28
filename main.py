@@ -25,8 +25,14 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     voice=root/"voice.wav"
     make_voiceover(narration_text,voice)
     narration_duration=media_duration(voice)
-    visual_duration=narration_duration+0.75
-    per_scene=visual_duration/max(len(storyboard["scenes"]),1)
+
+    # Ranking videos are driven by footage, not hook length.
+    if storyboard.get("format") == "ranking":
+        per_scene=5.0
+        visual_duration=per_scene*len(storyboard["scenes"])
+    else:
+        visual_duration=narration_duration+0.75
+        per_scene=visual_duration/max(len(storyboard["scenes"]),1)
 
     scene_paths=[]; scene_meta=[]
     for index,scene in enumerate(storyboard["scenes"],1):
@@ -49,7 +55,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         visual_master=ranked
 
     voiced=root/"voiced.mp4"
-    add_voice(visual_master,voice,voiced)
+    add_voice(visual_master,voice,voiced,duration=visual_duration)
 
     srt=root/"captions.srt"
     make_srt(narration_text,voice,srt)
