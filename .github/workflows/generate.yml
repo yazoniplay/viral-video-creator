@@ -7,13 +7,18 @@ on:
         description: "Optional topic. Leave empty for autonomous trend discovery."
         required: false
         type: string
+      longform:
+        description: "Generate a 4-6 minute landscape YouTube video instead of a Short."
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: "17 */6 * * *"
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -50,7 +55,11 @@ jobs:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.topic }}" ]; then
-            python main.py --topic "${{ inputs.topic }}"
+            if [ "${{ inputs.longform }}" = "true" ]; then
+              python main.py --topic "${{ inputs.topic }}" --longform
+            else
+              python main.py --topic "${{ inputs.topic }}"
+            fi
           else
             python main.py --autopilot
           fi
