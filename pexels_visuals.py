@@ -31,7 +31,7 @@ def _query(topic: str, scene: dict) -> str:
     stop = {"vertical","cinematic","scene","visualize","visual","realistic","motion","dynamic","premium","lighting","style","about","show","with","the","and","for","from","this","that","no","logos","text","footage","stock","video"}
     useful = [w for w in words if w not in stop and len(w) > 2]
     base = " ".join(useful[:7])
-    return base or topic
+    return base or "luxury mansion architecture"
 
 def _download(url: str, path: Path):
     with requests.get(url, stream=True, timeout=60) as r:
@@ -53,11 +53,18 @@ def make_scene(topic: str, scene: dict, index: int, output: Path, duration: floa
     orientation = "landscape" if landscape else "portrait"
     params = {"query": query, "orientation": orientation, "size": "medium", "per_page": 15}
     r = requests.get(API, headers=headers, params=params, timeout=30)
-    r.raise_for_status()
-    videos = r.json().get("videos", [])
-    if not videos:
-        params["query"] = topic
-        r = requests.get(API, headers=headers, params=params, timeout=30)
+    if r.status_code >= 500:
+        videos = []
+        for fallback in ("luxury mansion architecture", "luxury house exterior", "modern mansion interior"):
+            retry_params = dict(params)
+            retry_params["query"] = fallback
+            rr = requests.get(API, headers=headers, params=retry_params, timeout=30)
+            if rr.ok:
+                videos = rr.json().get("videos", [])
+                if videos:
+                    query = fallback
+                    break
+    else:
         r.raise_for_status()
         videos = r.json().get("videos", [])
     if not videos:
