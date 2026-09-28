@@ -47,9 +47,7 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
                 "camera":"dynamic handheld tracking",
                 "prompt":f"Realistic vertical stock VIDEO footage of {rank_to_prompt[playback_rank]}, continuous visible motion, athletic movement, clear beginning and landing, no text, no logos."
             })
-        script=(f"Here are five {topic}. At number five, we start with a solid run. Number four raises the difficulty. "
-                f"Number three is where the jumps get seriously technical. Number two is almost unbelievable. "
-                f"And number one is the cleanest and most impressive of them all.")
+        script=""
         return {"title":topic,"hook":hook,"script":script,"format":"ranking","ranking_count":5,
                 "ranking_entries":rank_entries,"scenes":scenes}
 
@@ -83,11 +81,13 @@ If ranking format:
 - Scenes must be returned in playback order: 5, 4, 3, 2, 1.
 - Give each entry a short, interesting name that actually describes what is being ranked.
 - Make the #1 entry the strongest payoff.
+- Do NOT write a narration script for ranking videos.
+- The hook is the ONLY spoken narration; make it short, punchy, and curiosity-driven.
 - Never ask the stock-video search for text, number badges, UI, logos, or graphics; the renderer adds the leaderboard.
 
 For every video:
-- Write 90-130 words of natural spoken narration.
-- The first sentence must create immediate curiosity.
+- For non-ranking videos, write 90-130 words of natural spoken narration.
+- For ranking videos, write ONLY a strong hook in the hook field; do not create a script.
 - Every scene must describe a distinct moving VIDEO event.
 - Every scene prompt must work as a real Pexels stock VIDEO search query.
 - Never request still images or static graphics.
