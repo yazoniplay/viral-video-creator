@@ -107,7 +107,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     return final
 
 if __name__=="__main__":
-    parser=argparse.ArgumentParser(description="Generate an original vertical short.")
+    parser=argparse.ArgumentParser(description="Generate an original high-retention YouTube video.")
     parser.add_argument("--topic",help="Topic to generate. Omit for autonomous trend mode.")
     parser.add_argument("--autopilot",action="store_true",help="Discover a fresh topic and generate automatically.")
     parser.add_argument("--longform",action="store_true",help="Generate a landscape long-form YouTube video.")
