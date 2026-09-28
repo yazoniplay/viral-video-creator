@@ -59,6 +59,61 @@ def _write_ranking_ass(path: Path, title: str, entries: list[dict], per_scene: f
     path.write_text("\n".join(lines)+"\n",encoding="utf-8")
 
 
+def _write_tier_ass(path: Path, title: str, entries: list[dict], per_scene: float, total_duration: float):
+    path.parent.mkdir(parents=True,exist_ok=True)
+    lines=[
+        "[Script Info]","ScriptType: v4.00+","PlayResX: 1920","PlayResY: 1080","ScaledBorderAndShadow: yes","",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+        "Style: Title,DejaVu Sans,52,&H00FFFFFF,&H00FFFFFF,&H00101010,&H00000000,-1,0,0,0,100,100,0,0,1,2,2,7,70,40,40,1",
+        "Style: Tier,DejaVu Sans,38,&H00FFFFFF,&H00FFFFFF,&H00101010,&H00000000,-1,0,0,0,100,100,0,0,1,2,2,7,72,40,40,1",
+        "Style: Item,DejaVu Sans,28,&H00FFFFFF,&H00FFFFFF,&H00101010,&H00000000,0,0,0,0,100,100,0,0,1,2,2,7,185,40,40,1",
+        "Style: Active,DejaVu Sans,31,&H0000FFFF,&H0000FFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,3,3,7,185,40,40,1",
+        "",
+        "[Events]","Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
+    lines.append(f"Dialogue: 0,0:00:00.00,{_ass_time(total_duration)},Title,,0,0,0,,{_ass_escape(title or 'TIER LIST')}")
+    tiers=["S","A","B","C","D"]
+    grouped={t:[] for t in tiers}
+    for e in entries:
+        grouped.get(str(e.get("tier","C")).upper(),grouped["C"]).append(e)
+    for row,tier in enumerate(tiers):
+        y=190+row*145
+        lines.append(f"Dialogue: 0,0:00:00.00,{_ass_time(total_duration)},Tier,,0,0,0,,{{\\pos(72,{y})}}{tier}")
+        x=185
+        for e in grouped[tier]:
+            item=_ass_escape(str(e.get("item") or "Item"))
+            lines.append(f"Dialogue: 0,0:00:00.00,{_ass_time(total_duration)},Item,,0,0,0,,{{\\pos({x},{y})}}{item}")
+            # Reserve a simple fixed slot so long item names do not overlap.
+            x += min(300,max(150,26*len(item)+45))
+    for index,e in enumerate(entries):
+        item=_ass_escape(str(e.get("item") or "Item"))
+        tier=str(e.get("tier") or "C").upper()
+        row=tiers.index(tier) if tier in tiers else 2
+        y=190+row*145
+        grouped_before=grouped[tier]
+        pos=next((i for i,x in enumerate(grouped_before) if x is e or x.get("item")==e.get("item")),0)
+        x=185+sum(min(300,max(150,26*len(str(x.get("item") or "Item"))+45)) for x in grouped_before[:pos])
+        start=index*per_scene
+        end=min(total_duration,(index+1)*per_scene)
+        lines.append(f"Dialogue: 1,{_ass_time(start)},{_ass_time(end)},Active,,0,0,0,,{{\\pos({x},{y})}}{item}")
+    path.write_text("\\n".join(lines)+"\\n",encoding="utf-8")
+
+def apply_tier_overlay(video: Path, storyboard: dict, output: Path, total_duration: float):
+    entries=storyboard.get("tier_entries") or []
+    if not entries:
+        raise RuntimeError("Tier-list video has no tier entries.")
+    scenes=storyboard.get("scenes") or []
+    per_scene=total_duration/max(len(scenes),1)
+    ass_path=output.with_suffix(".ass")
+    _write_tier_ass(ass_path,storyboard.get("title") or "TIER LIST",entries,per_scene,total_duration)
+    vf=f"ass=filename={ass_path.resolve()}"
+    subprocess.run([
+        "ffmpeg","-y","-i",str(video),"-vf",vf,
+        "-c:v","libx264","-preset","veryfast","-crf","20",
+        "-pix_fmt","yuv420p","-an",str(output)
+    ],check=True)
+
 def concat_scenes(scenes: list[Path], output: Path, width: int = 1080, height: int = 1920):
     if not scenes:
         raise RuntimeError("No scenes to concatenate.")
