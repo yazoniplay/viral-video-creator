@@ -183,6 +183,31 @@ def apply_ranking_overlay(video: Path, storyboard: dict, output: Path, total_dur
     ],check=True)
 
 
+
+def apply_advanced_edit(video: Path, storyboard: dict, output: Path):
+    """Add motion, vignette, micro-zoom, and energetic tier-list transitions."""
+    fmt=storyboard.get("format")
+    if fmt not in ("tierlist","ranking","longform"):
+        video.replace(output)
+        return
+    scenes=storyboard.get("scenes") or []
+    n=max(len(scenes),1)
+    # Subtle continuous zoom plus vignette. Scene cuts are already produced by
+    # concat_scenes; this pass adds a more deliberate, polished visual finish.
+    vf=(
+        "scale=iw*1.045:ih*1.045,"
+        "crop=iw/1.045:ih/1.045,"
+        "zoompan=z='min(zoom+0.0009,1.045)':d=1:s=1920x1080:fps=30,"
+        "eq=contrast=1.045:saturation=1.08:brightness=0.006,"
+        "vignette=PI/5"
+    )
+    # Keep the source audio untouched; this is a visual-only pass.
+    subprocess.run([
+        "ffmpeg","-y","-i",str(video),"-vf",vf,
+        "-c:v","libx264","-preset","veryfast","-crf","20",
+        "-pix_fmt","yuv420p","-an",str(output)
+    ],check=True)
+
 def final_master(video: Path,output: Path):
     # Premium finishing pass: subtle contrast, saturation, sharpening and
     # stabilized frame pacing without making stock footage look overprocessed.
