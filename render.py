@@ -59,7 +59,7 @@ def _write_ranking_ass(path: Path, title: str, entries: list[dict], per_scene: f
     path.write_text("\n".join(lines)+"\n",encoding="utf-8")
 
 
-def concat_scenes(scenes: list[Path], output: Path):
+def concat_scenes(scenes: list[Path], output: Path, width: int = 1080, height: int = 1920):
     if not scenes:
         raise RuntimeError("No scenes to concatenate.")
 
@@ -71,8 +71,8 @@ def concat_scenes(scenes: list[Path], output: Path):
         inputs += ["-i",str(path)]
         filters.append(
             f"[{i}:v:0]setpts=PTS-STARTPTS,trim=duration=99999,"
-            f"scale=1080:1920:force_original_aspect_ratio=increase,"
-            f"crop=1080:1920,setsar=1,fps=30,format=yuv420p[v{i}]"
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height},setsar=1,fps=30,format=yuv420p[v{i}]"
         )
     labels="".join(f"[v{i}]" for i in range(len(scenes)))
     filters.append(f"{labels}concat=n={len(scenes)}:v=1:a=0,setpts=PTS-STARTPTS[v]")
