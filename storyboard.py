@@ -63,7 +63,57 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
     while len(scenes)<VIDEO_SCENES: scenes.append(scenes[-1].copy())
     return {"title":topic,"hook":hook,"script":f"Here is the part about {topic} that most people miss. First, understand what is actually happening. Then look at why it matters. The surprising part is what happens next. Once you see the pattern, the whole story makes much more sense.","format":"explainer","scenes":scenes}
 
-def create_storyboard(topic: str, hook_override: str | None = None) -> dict[str, Any]:
+def _create_longform_storyboard(topic: str, hook_override: str | None = None) -> dict[str, Any]:
+    if not GEMINI_API_KEY:
+        return _create_longform_fallback(topic, hook_override)
+    prompt=f"""Topic: {topic}
+Preferred hook: {hook_override or "create a powerful cold open"}
+Create an ORIGINAL landscape long-form YouTube documentary/commentary video.
+Do not imitate any specific creator, channel, script, catchphrases, branding, or exact editing style.
+Target runtime: roughly 4-6 minutes.
+
+Write a strong cold-open hook followed by 650-850 words of natural spoken narration. Make it conversational, energetic, specific, and story-driven. Build curiosity, introduce context, escalate through several turning points, include surprising details, and end with a satisfying payoff. Do not invent precise facts when uncertain.
+
+Create exactly 30 distinct visual scenes. Each should cover roughly 8-12 seconds and describe a concrete moving VIDEO event realistically searchable on Pexels. Vary shots, subjects, locations, and camera movement. Never request still images, screenshots, graphics, text, logos, or photo slideshows.
+
+Return JSON keys: title, hook, script, format, chapters, scenes. Set format to longform."""
+    url="https://generativelanguage.googleapis.com/v1beta/models/"+GEMINI_MODEL+":generateContent"
+    try:
+        response=requests.post(url,headers={"x-goog-api-key":GEMINI_API_KEY,"Content-Type":"application/json"},json={
+            "systemInstruction":{"parts":[{"text":SYSTEM+"\nFor long-form videos, prioritize coherent storytelling, varied moving stock footage, and original narration."}]},
+            "contents":[{"parts":[{"text":prompt}]}],
+            "generationConfig":{"temperature":0.9,"responseMimeType":"application/json"}
+        },timeout=90)
+        response.raise_for_status()
+        result=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
+        scenes=[]
+        for i,scene in enumerate(result.get("scenes",[]),1):
+            if isinstance(scene,dict):
+                scenes.append({**scene,"purpose":str(scene.get("purpose") or f"Scene {i}"),"prompt":str(scene.get("prompt") or scene.get("description") or topic),"duration":8})
+        script=str(result.get("script") or "").strip()
+        if len(scenes)!=30 or len(script.split())<500:
+            raise ValueError("Long-form storyboard was incomplete")
+        result["scenes"]=scenes
+        result["format"]="longform"
+        return result
+    except (requests.RequestException, KeyError, IndexError, json.JSONDecodeError, ValueError) as exc:
+        print(f"Gemini long-form storyboard unavailable ({exc}); using local fallback storyboard.")
+        return _create_longform_fallback(topic,hook_override)
+
+def _create_longform_fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
+    hook=hook_override or f"You think you know {topic}. The real story is much stranger."
+    script=(f"{hook} {topic} has a story that becomes more interesting the closer you look. "
+            f"This fallback version follows the subject from its basic context into the details that make it worth watching. "
+            f"We start with what people already know, then move into the moments and decisions that changed the story. "
+            f"Along the way, the important details are the ones that are easiest to miss. "
+            f"By the end, the pieces connect into a much clearer picture of why {topic} matters. "
+            f"This is a local fallback, so richer factual research and a longer custom narrative require the Gemini-powered path.")
+    scenes=[{"duration":8,"purpose":f"chapter {i}","prompt":f"Realistic landscape stock VIDEO footage related to {topic}; visible moving subject, documentary b-roll, natural camera movement, no text, no logos."} for i in range(1,31)]
+    return {"title":topic,"hook":hook,"script":script,"format":"longform","scenes":scenes,"chapters":[]}
+
+def create_storyboard(topic: str, hook_override: str | None = None, longform: bool = False) -> dict[str, Any]:
+    if longform:
+        return _create_longform_storyboard(topic, hook_override)
     if not GEMINI_API_KEY:
         return fallback(topic, hook_override)
     ranking=is_ranking_topic(topic)
