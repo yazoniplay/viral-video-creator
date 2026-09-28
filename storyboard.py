@@ -78,7 +78,7 @@ Use exactly 8 ranked items and exactly 5 tiers: S, A, B, C, D.
 The video should be roughly 5-8 minutes.
 Write 700-1100 words of energetic spoken narration. Start with a short hook, then introduce items one at a time. For every item, explain why it belongs where it does using concrete, understandable reasoning. Build escalation so later items feel more surprising. End with a concise recap/payoff.
 
-Create exactly 8 visual scenes, one per item. Each scene must describe realistic MOVING landscape stock VIDEO footage searchable on Pexels for that specific item. Never request still images, screenshots, text, logos, charts, or static graphics.
+Create exactly 24 visual scenes: 3 distinct moving scenes for each of the 8 items, in item order. Every scene must identify its item and rank. Each scene must describe realistic MOVING landscape stock VIDEO footage searchable on Pexels for that specific item. Never request still images, screenshots, text, logos, charts, or static graphics.
 
 Return JSON keys:
 title, hook, script, format, tiers, tier_entries, scenes
@@ -108,9 +108,10 @@ Use the supplied topic literally and make the items concrete and visually search
         scenes=[]
         for i,scene in enumerate(result.get("scenes",[]),1):
             if isinstance(scene,dict):
-                scenes.append({**scene,"purpose":str(scene.get("purpose") or f"Item {i}"),"prompt":str(scene.get("prompt") or scene.get("description") or topic),"duration":8,"tier":entries[i-1]["tier"] if i<=len(entries) else "C","item":entries[i-1]["item"] if i<=len(entries) else f"Item {i}"})
+                item_index=min((i-1)//3,7)
+                scenes.append({**scene,"purpose":str(scene.get("purpose") or f"Item {item_index+1} scene {(i-1)%3+1}"),"prompt":str(scene.get("prompt") or scene.get("description") or topic),"duration":8,"tier":entries[item_index]["tier"] if item_index<len(entries) else "C","item":entries[item_index]["item"] if item_index<len(entries) else f"Item {item_index+1}"})
         script=str(result.get("script") or "").strip()
-        if len(entries)!=8 or len(scenes)!=8 or len(script.split())<500:
+        if len(entries)!=8 or len(scenes)!=24 or len(script.split())<500:
             raise ValueError("Tier-list storyboard was incomplete")
         result["tier_entries"]=entries
         result["scenes"]=scenes
@@ -126,9 +127,11 @@ def _create_tier_fallback(topic: str, hook_override: str | None = None) -> dict[
         ("Entry One","S"),("Entry Two","S"),("Entry Three","A"),("Entry Four","A"),
         ("Entry Five","B"),("Entry Six","B"),("Entry Seven","C"),("Entry Eight","D")
     ]
-    scenes=[{"duration":8,"purpose":f"item {i}: {item}","item":item,"tier":tier,
-             "prompt":f"Realistic landscape stock VIDEO footage related to {topic} and {item}; visible moving subject, documentary-style b-roll, natural camera movement, no text, no logos."}
-            for i,(item,tier) in enumerate(items,1)]
+    scenes=[]
+    for i,(item,tier) in enumerate(items,1):
+        for shot in range(1,4):
+            scenes.append({"duration":8,"purpose":f"item {i}: {item} shot {shot}","item":item,"tier":tier,
+                           "prompt":f"Realistic landscape stock VIDEO footage related to {topic} and {item}; distinct moving action, documentary-style b-roll, natural camera movement, no text, no logos."})
     script=(f"{hook} Today we are putting eight examples from {topic} into five tiers. "
             "We start with the obvious choices, then move into the cases that are much harder to place. "
             "Each one gets judged on the same basic idea: how impressive, useful, memorable, or important it actually is. "
