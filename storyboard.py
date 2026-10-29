@@ -72,7 +72,7 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
 
     research=_research_topic(topic)
     if research:
-        sentences=re.split(r"(?<=[.!?])\\s+",research)
+        sentences=re.split(r"(?<=[.!?])\s+",research)
         useful=[s.strip() for s in sentences if len(s.strip())>25]
         explanation=" ".join(useful[:5])
         hook=hook_override or f"Here's what matters about {topic} — and why it's more interesting than it first appears."
