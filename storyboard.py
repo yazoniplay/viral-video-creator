@@ -83,7 +83,7 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
         actions=[
             f"cinematic close-up of a real-world subject related to {topic}, with visible physical movement",
             f"wide documentary shot showing the real environment where {topic} is used or occurs",
-            f"macro view of a relevant physical mechanism related to {topic operating and moving",
+            f"macro view of a relevant physical mechanism related to {topic}, operating and moving",
             f"camera tracks alongside a real object demonstrating an important part of {topic}",
             f"clear visual demonstration of a consequence or application of {topic} in the real world",
             f"final cinematic pull-back revealing the wider context of {topic}",
