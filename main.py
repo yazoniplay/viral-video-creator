@@ -13,33 +13,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     print(f"[pipeline] started: {topic}",flush=True)
     creative_topic=topic+(f"\nCreative style notes: {style_notes}" if style_notes.strip() else "")
     storyboard=create_storyboard(creative_topic,hook_override,longform=longform)
-    # Enforce a varied 10-shot visual sequence for short explainers, even when
-    # the offline fallback storyboard has fewer distinct scenes.
-    if storyboard.get("format")=="explainer":
-        base=list(storyboard.get("scenes") or [])
-        shot_directions=[
-            ("macro detail","extreme close-up, intricate animated particles and shallow-depth cinematic composition"),
-            ("wide reveal","wide cinematic reveal, expanding light field and sweeping camera push"),
-            ("side tracking","lateral tracking movement, parallax layers crossing at different speeds"),
-            ("overhead geometry","top-down geometric motion, rotating rings and a perspective grid"),
-            ("impact moment","fast energetic light sweep, sharp contrast and particles bursting outward"),
-            ("slow orbit","slow orbital camera move around a glowing central subject"),
-            ("scale shift","rapid scale transition from tiny particles to large abstract structures"),
-            ("final payoff","bright reveal, converging lines and a confident cinematic pull-back"),
-        ]
-        used={str(s.get("purpose","")) for s in base}
-        for j,(purpose,direction) in enumerate(shot_directions):
-            if len(base)>=10: break
-            if purpose not in used:
-                source=dict(base[j % max(1,len(base))]) if base else {"prompt":topic}
-                source["purpose"]=purpose
-                source["prompt"]=str(source.get("prompt") or topic)+f"; distinct visual direction: {direction}; original code-generated motion graphics, no stock footage."
-                base.append(source); used.add(purpose)
-        # If the planner returned ten cloned fallback shots, diversify their visual prompts.
-        for j,scene in enumerate(base):
-            if j>=6 and (not scene.get("purpose") or scene.get("purpose")==base[min(j, len(base)-1)].get("purpose")):
-                scene["purpose"]=shot_directions[(j-6)%len(shot_directions)][0]
-        storyboard["scenes"]=base[:10]
+    # Keep the storyboard's actual distinct scenes. Never clone generic filler shots.
     if hook_override: storyboard["hook"]=hook_override
     storyboard["hook_variants"]=hook_variants or [storyboard.get("hook","")]
     storyboard["style_notes"]=style_notes
