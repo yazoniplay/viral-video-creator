@@ -40,6 +40,8 @@ def _parse_completed_event(raw: str):
             elif line.startswith("data:"):
                 data = line.split(":", 1)[1].strip()
         if event == "error":
+            # Gradio sometimes reports a ZeroGPU/model crash as the literal JSON null.
+            # Preserve the response context so the next failure is diagnosable.
             raise RuntimeError(f"LTX-Video generation failed: {data or 'unknown model error'}")
         if event == "complete" and data:
             payload = json.loads(data)
@@ -73,39 +75,57 @@ def _generate_remote(prompt: str, duration: float, scene: dict | None = None) ->
         0,
         True,
         1,
-        True,
+        False,
     ]
     headers = _headers()
-    try:
-        submit = requests.post(
-            f"{SPACE_BASE_URL}/gradio_api/call/{API_NAME}",
-            headers=headers,
-            json={"data": data},
-            timeout=45,
-        )
-        if not submit.ok:
-            raise RuntimeError(
-                f"Free LTX-Video service rejected the request (HTTP {submit.status_code}). "
-                "Its shared GPU may be busy, paused, or out of quota."
+    last_error = None
+    # The public ZeroGPU Space can occasionally fail a generation with an empty
+    # Gradio error payload. Retry twice with the slower multi-pass texture stage
+    # disabled above, then fail with the actual error instead of fake footage.
+    for attempt in range(1, 4):
+        try:
+            submit = requests.post(
+                f"{SPACE_BASE_URL}/gradio_api/call/{API_NAME}",
+                headers=headers,
+                json={"data": data},
+                timeout=45,
             )
-        event_id = submit.json().get("event_id")
-        if not event_id:
-            raise RuntimeError("Free LTX-Video service did not return a queue ID.")
+            if not submit.ok:
+                raise RuntimeError(
+                    f"Free LTX-Video service rejected the request (HTTP {submit.status_code}). "
+                    "Its shared GPU may be busy, paused, or out of quota."
+                )
+            event_id = submit.json().get("event_id")
+            if not event_id:
+                raise RuntimeError("Free LTX-Video service did not return a queue ID.")
 
-        print("[video] queued real text-to-video generation; waiting for shared GPU...", flush=True)
-        result = requests.get(
-            f"{SPACE_BASE_URL}/gradio_api/call/{API_NAME}/{event_id}",
-            headers=headers,
-            timeout=(20, 360),
-        )
-        if not result.ok:
-            raise RuntimeError(f"Lost connection to LTX-Video (HTTP {result.status_code}).")
-        return _parse_completed_event(result.text)
-    except requests.RequestException as exc:
-        raise RuntimeError(
-            "Could not reach the free LTX-Video service. The shared demo may be asleep, "
-            "rate-limited, or unavailable. No synthetic-circle fallback was rendered."
-        ) from exc
+            print(f"[video] queued real text-to-video generation (attempt {attempt}/3); waiting for shared GPU...", flush=True)
+            result = requests.get(
+                f"{SPACE_BASE_URL}/gradio_api/call/{API_NAME}/{event_id}",
+                headers=headers,
+                timeout=(20, 360),
+            )
+            if not result.ok:
+                raise RuntimeError(f"Lost connection to LTX-Video (HTTP {result.status_code}).")
+            return _parse_completed_event(result.text)
+        except requests.RequestException as exc:
+            last_error = RuntimeError(
+                "Could not reach the free LTX-Video service. The shared demo may be asleep, "
+                "rate-limited, or unavailable."
+            )
+            last_error.__cause__ = exc
+        except RuntimeError as exc:
+            last_error = exc
+
+        if attempt < 3:
+            print(f"[video] generation attempt {attempt} failed: {last_error}; retrying in 8 seconds...", flush=True)
+            time.sleep(8)
+
+    raise RuntimeError(
+        f"Free LTX-Video generation failed after 3 attempts: {last_error}. "
+        "The shared hosted GPU may be overloaded or the model may have crashed. "
+        "No synthetic-circle fallback was rendered."
+    ) from last_error
 
 
 def generate_scene(
