@@ -59,7 +59,7 @@ def make_scene(topic, scene, index, output, duration=None):
     tmp=output.with_suffix(".frames"); tmp.mkdir(exist_ok=True)
     f_hero=font(64); f_sub=font(26,False); f_index=font(22)
     short_topic=" ".join(re.sub(r"[^\w\s'-]"," ",topic).split())
-    words=wrap(ImageDraw.Draw(Image.new("RGB",(1,1))), short_topic, f_hero, W-130)[:3]
+    words=wrap(ImageDraw.Draw(Image.new("RGB",(1,1))), purpose.title(), f_hero, W-130)[:3]
     # Give every scene a different visual language; all elements are animated.
     mode=index % 6
     for n in range(frames):
@@ -132,7 +132,7 @@ def make_scene(topic, scene, index, output, duration=None):
         ty=int(H*.63)+rise
         for j,line in enumerate(words):
             d.text((64,ty+j*76),line,font=f_hero,fill=(255,255,255,248),stroke_width=2,stroke_fill=(0,0,0,80))
-        subtitle=purpose.upper()[:68]
+        subtitle=short_topic.upper()[:68]
         d.text((66,min(H-90,ty+len(words)*78+18)),subtitle,font=f_sub,fill=(*accent,240))
         # Gentle camera push simulated via small crop offset and scale.
         img=img.convert("RGB")
