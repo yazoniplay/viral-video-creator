@@ -23,7 +23,7 @@ def is_ranking_topic(topic: str) -> bool:
 def _research_topic(topic: str) -> str:
     """Fetch topic-specific facts from Wikipedia's free public API."""
     # Style notes are not part of the research query.
-    query=topic.split("\\nCreative style notes:",1)[0].strip()
+    query=topic.split("\nCreative style notes:",1)[0].strip()
     if not query:
         return ""
     headers={"User-Agent":"ViralVideoCreator/1.0 (educational video generator)"}
