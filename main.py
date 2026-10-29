@@ -56,7 +56,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         visual_duration=max(narration_duration+1.0,len(storyboard["scenes"])*6.0)
         per_scene=visual_duration/max(len(storyboard["scenes"]),1)
     else:
-        visual_duration=max(narration_duration+0.75,len(storyboard["scenes"])*5.0)
+        visual_duration=narration_duration+0.75
         per_scene=visual_duration/max(len(storyboard["scenes"]),1)
 
     scene_paths=[]; scene_meta=[]
