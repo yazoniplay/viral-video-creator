@@ -110,7 +110,7 @@ Use exactly 8 ranked items and exactly 5 tiers: S, A, B, C, D.
 The video should be roughly 5-8 minutes.
 Write 700-1100 words of energetic spoken narration. Start with a short hook, then introduce items one at a time. For every item, explain why it belongs where it does using concrete, understandable reasoning. Build escalation so later items feel more surprising. End with a concise recap/payoff.
 
-Create exactly 24 visual scenes: 3 distinct moving scenes for each of the 8 items, in item order. Every scene must identify its item and rank. Each scene must describe realistic MOVING landscape stock VIDEO footage searchable on Pexels for that specific item. Never request still images, screenshots, text, logos, charts, or static graphics.
+Create exactly 24 visual scenes: 3 distinct moving scenes for each of the 8 items, in item order. Every scene must identify its item and rank. Each scene must describe realistic moving video footage generated from a text prompt for that specific item. Never request still images, screenshots, text, logos, charts, or static graphics.
 
 Return JSON keys:
 title, hook, script, format, tiers, tier_entries, scenes
@@ -163,7 +163,7 @@ def _create_tier_fallback(topic: str, hook_override: str | None = None) -> dict[
     for i,(item,tier) in enumerate(items,1):
         for shot in range(1,4):
             scenes.append({"duration":8,"purpose":f"item {i}: {item} shot {shot}","item":item,"tier":tier,
-                           "prompt":f"Realistic landscape stock VIDEO footage related to {topic} and {item}; distinct moving action, documentary-style b-roll, natural camera movement, no text, no logos."})
+                           "prompt":f"Original AI-generated realistic landscape video footage related to {topic} and {item}; distinct moving action, documentary-style b-roll, natural camera movement, no text, no logos."})
     script=(f"{hook} Today we are putting eight examples from {topic} into five tiers. "
             "We start with the obvious choices, then move into the cases that are much harder to place. "
             "Each one gets judged on the same basic idea: how impressive, useful, memorable, or important it actually is. "
@@ -217,7 +217,7 @@ def _create_longform_fallback(topic: str, hook_override: str | None = None) -> d
             f"Along the way, the important details are the ones that are easiest to miss. "
             f"By the end, the pieces connect into a much clearer picture of why {topic} matters. "
             f"This is a local fallback, so richer factual research and a longer custom narrative require the Gemini-powered path.")
-    scenes=[{"duration":8,"purpose":f"chapter {i}","prompt":f"Realistic landscape stock VIDEO footage related to {topic}; visible moving subject, documentary b-roll, natural camera movement, no text, no logos."} for i in range(1,31)]
+    scenes=[{"duration":8,"purpose":f"chapter {i}","prompt":f"Original AI-generated realistic landscape video footage related to {topic}; visible moving subject, documentary b-roll, natural camera movement, no text, no logos."} for i in range(1,31)]
     return {"title":topic,"hook":hook,"script":script,"format":"longform","scenes":scenes,"chapters":[]}
 
 def create_storyboard(topic: str, hook_override: str | None = None, longform: bool = False) -> dict[str, Any]:
@@ -250,7 +250,7 @@ For every video:
 - For non-ranking videos, write 90-130 words of natural spoken narration.
 - For ranking videos, write ONLY a strong hook in the hook field; do not create a script.
 - Every scene must describe a distinct moving VIDEO event.
-- Every scene prompt must work as a real Pexels stock VIDEO search query.
+- Every scene prompt must work as a text-to-video generation prompt.
 - Never request still images or static graphics.
 - Keep the visuals tightly connected to what is being said.
 Return JSON keys: title, hook, script, format, ranking_entries, scenes."""
