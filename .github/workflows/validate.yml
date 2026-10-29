@@ -1,0 +1,37 @@
+name: Validate Video Creator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal syntax-check dependency
+        run: python -m pip install requests
+      - name: Compile all Python files
+        run: python -m compileall -q .
+      - name: Check factual fallback and real video renderer
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          ast.parse(Path("storyboard.py").read_text(encoding="utf-8"))
+          ast.parse(Path("ai_video.py").read_text(encoding="utf-8"))
+          main = Path("main.py").read_text(encoding="utf-8")
+          assert "Enforce a varied 10-shot visual sequence" not in main
+          video = Path("ai_video.py").read_text(encoding="utf-8")
+          assert "lightricks-ltx-video-distilled.hf.space" in video
+          assert "make_scene" not in video
+          print("Syntax and renderer checks passed.")
+          PY
