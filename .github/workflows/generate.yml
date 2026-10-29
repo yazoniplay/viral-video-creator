@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       topic:
-        description: "Optional topic. Leave empty for autonomous trend discovery."
+        description: "Topic for the video"
+        required: true
+        type: string
+      style_notes:
+        description: "Optional visual direction (e.g. cinematic, fast cuts, neon sci-fi, documentary)"
         required: false
         type: string
       longform:
-        description: "Generate a 4-6 minute landscape YouTube video instead of a Short."
+        description: "Generate a landscape YouTube video instead of a vertical Short"
         required: false
         default: false
         type: boolean
@@ -18,56 +22,42 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     permissions:
       contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: FFmpeg + TTS runtime
+      - name: FFmpeg and fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg espeak-ng
+          sudo apt-get install -y ffmpeg espeak-ng fonts-dejavu-core
           ffmpeg -version
           ffprobe -version
-
-      - name: Verify FFmpeg subtitle rendering
-        run: |
-          if ! ffmpeg -hide_banner -filters | grep -E '(^|[[:space:]])ass([[:space:]]|$)'; then
-            echo "ASS subtitle filter is missing from the FFmpeg binary"
-            ffmpeg -hide_banner -filters
-            exit 1
-          fi
-
       - name: Dependencies
         run: pip install -r requirements.txt
-
       - name: Generate
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.topic }}" ]; then
             if [ "${{ inputs.longform }}" = "true" ]; then
-              python main.py --topic "${{ inputs.topic }}" --longform
+              python main.py --topic "${{ inputs.topic }}" --style-notes "${{ inputs.style_notes }}" --longform
             else
-              python main.py --topic "${{ inputs.topic }}"
+              python main.py --topic "${{ inputs.topic }}" --style-notes "${{ inputs.style_notes }}"
             fi
           else
             python main.py --autopilot
           fi
-
-      - name: Upload final video only
+      - name: Upload complete video package
         uses: actions/upload-artifact@v4
         with:
-          name: final-video-${{ github.run_number }}
-          path: output/**/final.mp4
+          name: viral-video-${{ github.run_number }}
+          path: output/**/
           if-no-files-found: error
           retention-days: 7
