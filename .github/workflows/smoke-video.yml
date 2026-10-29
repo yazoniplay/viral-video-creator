@@ -1,0 +1,40 @@
+name: One-Time Real Video Pipeline Test
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  smoke-video:
+    if: github.event.head_commit.message == 'One-time run of real video pipeline'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: FFmpeg and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng fonts-dejavu-core
+      - name: Dependencies
+        run: pip install -r requirements.txt
+      - name: Generate actual short video
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python main.py --topic "Why your smartphone is more powerful than the computers that sent humans to the Moon" --style-notes "Cinematic science documentary, actual generated physical footage, fast editorial cuts, suspenseful narration, surprising facts, powerful ending. No abstract circles or stock footage."
+      - name: Upload generated video package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-video-pipeline-test
+          path: output/**/
+          if-no-files-found: warn
+          retention-days: 3
