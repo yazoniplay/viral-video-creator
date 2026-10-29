@@ -1,6 +1,6 @@
 # Viral Video Creator
 
-A $0-first, topic-to-video generator designed to run entirely from GitHub Actions. It creates original animated footage locally, writes narration and captions, assembles a finished MP4, and exports a thumbnail plus a captions/hashtags file.
+A $0-first topic-to-video generator designed to run from GitHub Actions. It requests short, original text-to-video clips from the public LTX-Video hosted demo, then assembles them with narration, captions, and a thumbnail. It does not intentionally substitute abstract circles or stock footage when generation fails.
 
 ## Output
 
@@ -14,7 +14,7 @@ Every run creates a folder under `output/<run-id>/` containing:
 
 ## Visual approach
 
-The visual engine renders original motion graphics from code: animated light fields, parallax particles, perspective grids, orbital geometry, moving beams, scene-specific compositions, controlled push-ins, and editorial typography. It does **not** download stock footage or call a paid video-generation API. This is stylized procedural footage rather than photorealistic AI video.
+The visual engine requests genuine generated video clips from the public LTX-Video hosted demo, then uses FFmpeg to crop to 9:16 and master at 1080×1920 / 60 FPS. It uses no paid video API and does not download stock footage. The hosted GPU is shared and may be queued, paused, or rate-limited; failed generation stops the workflow instead of falling back to abstract motion graphics. If Gemini is unavailable, the storyboard attempts to use Wikipedia's free public API for factual context and fails clearly if it cannot obtain research.
 
 ## Run in GitHub
 
@@ -24,7 +24,7 @@ The visual engine renders original motion graphics from code: animated light fie
 4. Enter a topic and optional style notes.
 5. Download the generated MP4, thumbnail and captions from the run's artifact.
 
-The workflow uses Python, FFmpeg, Pillow, NumPy and local Kokoro TTS. Gemini is optional for stronger scripts/storyboards; when configured, add `GEMINI_API_KEY` in repository Actions secrets. Without it, the local fallback still works. No Pexels key is required for the procedural footage engine.
+The workflow uses Python, FFmpeg and Kokoro TTS. Gemini can provide stronger storyboards when `GEMINI_API_KEY` is available; without it, the script attempts free Wikipedia research rather than inventing a generic explanation. `HF_TOKEN` is optional and may help if the hosted demo requires authentication, but does not provide paid capacity.
 
 ## Local run
 
