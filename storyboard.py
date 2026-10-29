@@ -20,52 +20,84 @@ def is_ranking_topic(topic: str) -> bool:
     t=topic.lower()
     return any(x in t for x in ("top ", "top 5", "top 10", "ranking", "ranked", "funniest", "funny moments", "best moments", "worst moments", "countdown")) and not is_tier_topic(topic)
 
+def _research_topic(topic: str) -> str:
+    """Use Wikipedia's free public REST API for factual context when Gemini is unavailable."""
+    try:
+        response=requests.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={"action":"query","list":"search","srsearch":topic,"format":"json","srlimit":3},
+            headers={"User-Agent":"ViralVideoCreator/1.0 (educational video generator)"},
+            timeout=12,
+        )
+        response.raise_for_status()
+        hits=response.json().get("query",{}).get("search",[])
+        for hit in hits:
+            title=hit.get("title","")
+            if not title:
+                continue
+            summary=requests.get(
+                "https://en.wikipedia.org/api/rest_v1/page/summary/"+requests.utils.quote(title.replace(" ","_"),safe=""),
+                headers={"User-Agent":"ViralVideoCreator/1.0 (educational video generator)"},
+                timeout=12,
+            )
+            if summary.ok:
+                data=summary.json()
+                extract=" ".join(str(data.get("extract","")).split())
+                if len(extract)>180:
+                    return extract
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        print(f"Free topic research unavailable: {exc}")
+    return ""
+
+
 def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
     ranking=is_ranking_topic(topic)
-    hook=hook_override or (f"These are the moments that deserve the top spots in {topic}." if ranking else f"You probably don't know this about {topic}.")
     if ranking:
-        count=5
-        names=[
-            "The Warm-Up",
-            "The Clean Landing",
-            "The Near Miss",
-            "The Impossible Gap",
-            "The Perfect Run",
-        ]
+        names=["The Warm-Up","The Clean Landing","The Near Miss","The Impossible Gap","The Perfect Run"]
         rank_entries=[{"rank":i,"name":names[5-i]} for i in range(1,6)]
         rank_to_prompt={
-            5:"a simple but impressive parkour movement with a clean landing",
-            4:"a fast parkour run with a more difficult obstacle",
-            3:"a technical parkour sequence with a risky-looking but controlled jump",
-            2:"an extremely difficult parkour gap with a dramatic landing",
-            1:"an extraordinary parkour sequence with a spectacular clean finish"
+            5:"an athlete performs a basic parkour jump and lands cleanly on a low obstacle",
+            4:"a parkour athlete runs toward a series of obstacles and clears them in one continuous motion",
+            3:"a parkour athlete carefully jumps across a gap between two safe training platforms",
+            2:"a skilled athlete performs a difficult parkour sequence in a professional training gym",
+            1:"a skilled athlete completes a fast, fluid parkour run and sticks the final landing",
         }
         scenes=[]
-        for playback_rank in range(5,0,-1):
-            entry=next(x for x in rank_entries if x["rank"]==playback_rank)
-            scenes.append({
-                "duration":5,
-                "purpose":f"rank {playback_rank}",
-                "rank":playback_rank,
-                "name":entry["name"],
-                "camera":"dynamic handheld tracking",
-                "prompt":f"Realistic vertical stock VIDEO footage of {rank_to_prompt[playback_rank]}, continuous visible motion, athletic movement, clear beginning and landing, no text, no logos."
-            })
-        script=""
-        return {"title":topic,"hook":hook,"script":script,"format":"ranking","ranking_count":5,
-                "ranking_entries":rank_entries,"scenes":scenes}
+        for rank in range(5,0,-1):
+            scenes.append({"duration":5,"purpose":f"rank {rank}","rank":rank,
+                           "name":next(x["name"] for x in rank_entries if x["rank"]==rank),
+                           "camera":"dynamic tracking","prompt":rank_to_prompt[rank]})
+        return {"title":topic,"hook":hook_override or f"Which examples of {topic} really deserve the top spot?",
+                "script":"","format":"ranking","ranking_count":5,"ranking_entries":rank_entries,"scenes":scenes}
 
-    prompts=[
-        ("instant visual hook","fast push-in",f"Realistic vertical stock VIDEO footage about {topic}; immediate physical action, surprising subject, clear motion, no text, no logos."),
-        ("establish context","lateral tracking",f"Realistic vertical stock VIDEO footage showing the world around {topic}; concrete subject performing a visible action, natural motion, no text, no logos."),
-        ("first key idea","controlled orbit",f"Realistic vertical stock VIDEO footage demonstrating the first important idea behind {topic} through a physical action, detailed and believable, no text."),
-        ("escalation","low-angle tracking",f"Realistic vertical stock VIDEO footage connected to {topic}; increasing scale and motion, dramatic but believable action, no text, no logos."),
-        ("surprising payoff","rapid reveal then close-up",f"Realistic vertical stock VIDEO footage of a surprising reveal connected to {topic}; clear cause and effect, visible movement, no text."),
-        ("loopable ending","slow pull-back",f"Realistic vertical stock VIDEO footage about {topic} that echoes the opening subject and motion, smooth movement, no text, no logos.")
-    ]
-    scenes=[{"duration":5,"purpose":p,"camera":c,"prompt":x,"continuity":"Keep visual language and the main subject coherent."} for p,c,x in prompts[:VIDEO_SCENES]]
-    while len(scenes)<VIDEO_SCENES: scenes.append(scenes[-1].copy())
-    return {"title":topic,"hook":hook,"script":f"Here is the part about {topic} that most people miss. First, understand what is actually happening. Then look at why it matters. The surprising part is what happens next. Once you see the pattern, the whole story makes much more sense.","format":"explainer","scenes":scenes}
+    research=_research_topic(topic)
+    if research:
+        sentences=re.split(r"(?<=[.!?])\\s+",research)
+        useful=[s.strip() for s in sentences if len(s.strip())>25]
+        explanation=" ".join(useful[:5])
+        hook=hook_override or f"Here's what matters about {topic} — and why it's more interesting than it first appears."
+        script=(f"{hook} {explanation} "
+                "The key is to connect those facts rather than memorize them: the underlying mechanism explains why the result happens. "
+                "That is what makes this topic useful to understand, not just recognize.")
+        # Scene prompts turn the researched explanation into concrete generated shots.
+        actions=[
+            f"cinematic close-up of a real-world subject related to {topic}, with visible physical movement",
+            f"wide documentary shot showing the real environment where {topic} is used or occurs",
+            f"macro view of a relevant physical mechanism related to {topic operating and moving",
+            f"camera tracks alongside a real object demonstrating an important part of {topic}",
+            f"clear visual demonstration of a consequence or application of {topic} in the real world",
+            f"final cinematic pull-back revealing the wider context of {topic}",
+        ]
+        scenes=[{"duration":5,"purpose":f"explanation beat {i+1}","camera":"documentary tracking",
+                 "prompt":actions[i]} for i in range(VIDEO_SCENES)]
+        return {"title":topic,"hook":hook,"script":script,"format":"explainer","scenes":scenes,
+                "research_source":"Wikipedia REST API","research_summary":research}
+
+    # If the free research endpoint is unavailable, do not invent facts.
+    raise RuntimeError(
+        "Could not create a factual script: Gemini is unavailable and free topic research failed. "
+        "Try again later or check the network. The pipeline will not publish generic filler narration."
+    )
 
 def _create_tier_storyboard(topic: str, hook_override: str | None = None) -> dict[str, Any]:
     if not GEMINI_API_KEY:
