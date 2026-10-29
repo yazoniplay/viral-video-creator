@@ -85,12 +85,28 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
 
     research=_research_topic(topic)
     if research:
-        sentences=re.split(r"(?<=[.!?])\s+",research)
+        sentences=re.split(r"(?<=[.!?])\\s+",research)
         useful=[s.strip() for s in sentences if len(s.strip())>25]
-        explanation=" ".join(useful[:5])
-        hook=hook_override or f"Here's what matters about {topic} — and why it's more interesting than it first appears."
-        script=(f"{hook} {explanation} "
-                f"Those are the documented details behind {topic}. Keep those facts in mind, because they explain what the topic actually is and why it matters.")
+        # Keep narration short enough for a 15–60 second short. Long Wikipedia
+        # extracts used to create >90-second narration for only six generated clips.
+        selected=[]
+        word_budget=48
+        for sentence in useful:
+            words=sentence.split()
+            if not words:
+                continue
+            remaining=word_budget-sum(len(item.split()) for item in selected)
+            if remaining <= 0:
+                break
+            if len(words) <= remaining:
+                selected.append(sentence)
+            elif remaining >= 8:
+                selected.append(" ".join(words[:remaining]).rstrip(",;:") + ".")
+            break
+        explanation=" ".join(selected)
+        hook=hook_override or f"Here's what matters about {topic}."
+        ending="That's why this matters."
+        script=f"{hook} {explanation} {ending}".strip()
         # Scene prompts turn the researched explanation into concrete generated shots.
         actions=[
             f"cinematic close-up of a real-world subject related to {topic}, with visible physical movement",
