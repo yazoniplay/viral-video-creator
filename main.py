@@ -76,7 +76,7 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
     manifest={"run_id":run_id,"topic":topic,"style_notes":style_notes,"title":storyboard.get("title"),"hook":storyboard.get("hook"),
       "hook_variants":storyboard.get("hook_variants",[]),"format":storyboard.get("format"),"ranking_entries":storyboard.get("ranking_entries",[]),
       "tier_entries":storyboard.get("tier_entries",[]),"script":storyboard.get("script"),"trend":selected_trend,"scenes":scene_meta,
-      "generation":{"mode":"original_cinematic_procedural","voice":"kokoro_local","scene_count":len(scene_paths),"fps":60,"external_video_generation":False},
+      "generation":{"mode":"hosted_ltx_text_to_video","voice":"kokoro_local","scene_count":len(scene_paths),"fps":60,"external_video_generation":True,"free_hosted_gpu":True},
       "qc":qc,"files":{"video":str(final),"thumbnail":str(thumbnail),"storyboard":str(root/"storyboard.json"),"captions":str(srt),"social_copy":str(social)}}
     (root/"manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
     print(f"[pipeline] QC passed: {qc}",flush=True)
