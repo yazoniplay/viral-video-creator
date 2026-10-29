@@ -21,30 +21,42 @@ def is_ranking_topic(topic: str) -> bool:
     return any(x in t for x in ("top ", "top 5", "top 10", "ranking", "ranked", "funniest", "funny moments", "best moments", "worst moments", "countdown")) and not is_tier_topic(topic)
 
 def _research_topic(topic: str) -> str:
-    """Use Wikipedia's free public REST API for factual context when Gemini is unavailable."""
+    """Fetch topic-specific facts from Wikipedia's free public API."""
+    # Style notes are not part of the research query.
+    query=topic.split("\\nCreative style notes:",1)[0].strip()
+    if not query:
+        return ""
+    headers={"User-Agent":"ViralVideoCreator/1.0 (educational video generator)"}
     try:
         response=requests.get(
             "https://en.wikipedia.org/w/api.php",
-            params={"action":"query","list":"search","srsearch":topic,"format":"json","srlimit":3},
-            headers={"User-Agent":"ViralVideoCreator/1.0 (educational video generator)"},
-            timeout=12,
+            params={"action":"query","list":"search","srsearch":query,"format":"json","srlimit":5},
+            headers=headers,
+            timeout=15,
         )
         response.raise_for_status()
         hits=response.json().get("query",{}).get("search",[])
+        extracts=[]
         for hit in hits:
             title=hit.get("title","")
             if not title:
                 continue
             summary=requests.get(
                 "https://en.wikipedia.org/api/rest_v1/page/summary/"+requests.utils.quote(title.replace(" ","_"),safe=""),
-                headers={"User-Agent":"ViralVideoCreator/1.0 (educational video generator)"},
-                timeout=12,
+                headers=headers,
+                timeout=15,
             )
-            if summary.ok:
-                data=summary.json()
-                extract=" ".join(str(data.get("extract","")).split())
-                if len(extract)>180:
-                    return extract
+            if not summary.ok:
+                continue
+            data=summary.json()
+            extract=" ".join(str(data.get("extract","")).split())
+            if len(extract)>100 and extract not in extracts:
+                extracts.append(extract)
+            if len(extracts)>=3:
+                break
+        if extracts:
+            return " ".join(extracts)
+        print(f"Free topic research returned no usable pages for query: {query!r}")
     except (requests.RequestException, ValueError, KeyError) as exc:
         print(f"Free topic research unavailable: {exc}")
     return ""
@@ -77,8 +89,7 @@ def fallback(topic: str, hook_override: str | None = None) -> dict[str, Any]:
         explanation=" ".join(useful[:5])
         hook=hook_override or f"Here's what matters about {topic} — and why it's more interesting than it first appears."
         script=(f"{hook} {explanation} "
-                "The key is to connect those facts rather than memorize them: the underlying mechanism explains why the result happens. "
-                "That is what makes this topic useful to understand, not just recognize.")
+                f"Those are the documented details behind {topic}. Keep those facts in mind, because they explain what the topic actually is and why it matters.")
         # Scene prompts turn the researched explanation into concrete generated shots.
         actions=[
             f"cinematic close-up of a real-world subject related to {topic}, with visible physical movement",
