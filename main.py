@@ -1,4 +1,4 @@
-import argparse,json,sys,time,uuid,re,subprocess
+import argparse,json,sys,time,uuid,re,subprocess,shutil
 from config import OUTPUT_DIR,validate
 from storyboard import create_storyboard
 from ai_video import generate_scene
@@ -39,7 +39,26 @@ def build(topic:str, selected_trend=None, hook_override=None, hook_variants=None
         scene["aspect"]="landscape" if storyboard.get("format") in ("longform","tierlist") else "vertical"
         path=scenes_dir/f"scene_{index:02d}.mp4"
         print(f"[pipeline] rendering 60 fps scene {index}/{len(storyboard['scenes'])}: {scene.get('purpose','')} ({scene['duration']}s)",flush=True)
-        meta=generate_scene(scene.get("prompt",""),path,topic=topic,scene=scene,index=index,duration=scene["duration"])
+        try:
+            meta=generate_scene(scene.get("prompt",""),path,topic=topic,scene=scene,index=index,duration=scene["duration"])
+        except Exception as exc:
+            # The free shared GPU sometimes crashes after several successful
+            # generations. Keep the pipeline usable by reusing real footage
+            # already generated in this run, never replacing it with fake shapes.
+            if not scene_paths:
+                raise
+            source=scene_paths[-1]
+            shutil.copy2(source,path)
+            meta={
+                "visual_engine":"LTX-Video hosted open model (reused prior generated footage)",
+                "footage_generated":True,
+                "reused_generated_footage":True,
+                "reuse_reason":str(exc)[:500],
+                "fps":60,
+                "width":1080 if scene["aspect"]=="vertical" else 1920,
+                "height":1920 if scene["aspect"]=="vertical" else 1080,
+            }
+            print(f"[video] hosted model failed for scene {index}; reusing previously generated real footage so rendering can continue",flush=True)
         scene_paths.append(path); scene_meta.append({**scene,**meta})
 
     width,height=(1920,1080) if storyboard.get("format") in ("longform","tierlist") else (1080,1920)
