@@ -141,9 +141,11 @@ def generate_scene(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     scene_prompt = str(scene.get("prompt") or prompt or topic).strip()
     purpose = str(scene.get("purpose") or f"scene {index}")
+    landscape = bool(scene.get("aspect") == "landscape")
+    aspect_description = "landscape 16:9" if landscape else "vertical 9:16"
     # Ask for a concrete physical subject/action, not abstract design language.
     full_prompt = (
-        f"Photorealistic cinematic documentary video, vertical 9:16. Subject/topic: {topic}. "
+        f"Photorealistic cinematic documentary video, {aspect_description}. Subject/topic: {topic}. "
         f"Specific shot: {purpose}. Show this concrete visible action: {scene_prompt}. "
         "Real camera footage, natural physical movement, believable lighting, detailed environment, "
         "camera motion appropriate to the action. No text, no diagrams, no logos, no abstract shapes."
@@ -163,7 +165,6 @@ def generate_scene(
 
         import subprocess
         target_duration = max(2.0, float(duration or 4.0))
-        landscape = bool(scene.get("aspect") == "landscape")
         out_width, out_height = (1920, 1080) if landscape else (1080, 1920)
         command = [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
