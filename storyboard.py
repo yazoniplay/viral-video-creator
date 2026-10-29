@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 import requests
 from config import GEMINI_API_KEY, GEMINI_MODEL, VIDEO_SCENES
