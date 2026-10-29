@@ -54,11 +54,12 @@ def _parse_completed_event(raw: str):
     raise RuntimeError("LTX-Video closed the queue stream without returning a video.")
 
 
-def _generate_remote(prompt: str, duration: float) -> str:
+def _generate_remote(prompt: str, duration: float, scene: dict | None = None) -> str:
     # Keep each generation small enough for a shared free ZeroGPU queue.
     seconds = max(2.0, min(5.0, float(duration)))
     # Vertical aspect ratio, within the public Space's advertised limits.
-    height, width = 896, 512
+    landscape = bool((scene or {}).get("aspect") == "landscape")
+    height, width = (512, 896) if landscape else (896, 512)
     data = [
         prompt,
         NEGATIVE_PROMPT,
@@ -128,7 +129,7 @@ def generate_scene(
         "camera motion appropriate to the action. No text, no diagrams, no logos, no abstract shapes."
     )
     print(f"[video] generating real footage for scene {index}: {purpose}", flush=True)
-    remote_url = _generate_remote(full_prompt, duration or 4.0)
+    remote_url = _generate_remote(full_prompt, duration or 4.0, scene=scene)
     downloaded = output_path.with_suffix(".source.mp4")
     try:
         with requests.get(remote_url, headers=_headers(), stream=True, timeout=(20, 180)) as response:
@@ -142,13 +143,15 @@ def generate_scene(
 
         import subprocess
         target_duration = max(2.0, float(duration or 4.0))
+        landscape = bool(scene.get("aspect") == "landscape")
+        out_width, out_height = (1920, 1080) if landscape else (1080, 1920)
         command = [
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
             "-i", str(downloaded),
             "-t", str(target_duration),
             "-vf",
-            "scale=1080:1920:force_original_aspect_ratio=increase,"
-            "crop=1080:1920,fps=60,setsar=1",
+            f"scale={out_width}:{out_height}:force_original_aspect_ratio=increase,"
+            f"crop={out_width}:{out_height},fps=60,setsar=1",
             "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-pix_fmt", "yuv420p", "-movflags", "+faststart",
             str(output_path),
@@ -162,8 +165,8 @@ def generate_scene(
             "source_url": remote_url,
             "source_duration_seconds": target_duration,
             "fps": 60,
-            "width": 1080,
-            "height": 1920,
+            "width": out_width,
+            "height": out_height,
         }
     finally:
         try:
